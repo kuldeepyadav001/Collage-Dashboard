@@ -1,18 +1,20 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
 
 interface YearContextValue {
   selectedYear: number | null;
   setSelectedYear: (year: number | null) => void;
+  refreshBump: number;
+  triggerRefresh: () => void;
 }
 
 const YearContext = createContext<YearContextValue | undefined>(undefined);
 
 export function YearProvider({ children }: { children: React.ReactNode }) {
   const [selectedYear, setSelectedYearState] = useState<number | null>(null);
+  const [refreshBump, setRefreshBump] = useState(0);
 
-  // Load from localStorage on mount
   useEffect(() => {
     const stored = localStorage.getItem("selectedYear");
     if (stored) setSelectedYearState(Number(stored));
@@ -24,8 +26,14 @@ export function YearProvider({ children }: { children: React.ReactNode }) {
     else localStorage.setItem("selectedYear", String(year));
   };
 
+  const triggerRefresh = useCallback(() => {
+    setRefreshBump((n) => n + 1);
+  }, []);
+
   return (
-    <YearContext.Provider value={{ selectedYear, setSelectedYear }}>
+    <YearContext.Provider
+      value={{ selectedYear, setSelectedYear, refreshBump, triggerRefresh }}
+    >
       {children}
     </YearContext.Provider>
   );

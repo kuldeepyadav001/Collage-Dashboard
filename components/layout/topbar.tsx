@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -24,9 +25,12 @@ const roleLabels: Record<string, string> = {
 };
 
 const roleColors: Record<string, string> = {
-  SUPER_ADMIN: "bg-[hsl(var(--destructive))]/10 text-[hsl(var(--destructive))] ring-1 ring-[hsl(var(--destructive))]/20",
-  WRITE_ADMIN: "bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))] ring-1 ring-[hsl(var(--primary))]/20",
-  READER: "bg-[hsl(var(--gold))]/10 text-[hsl(var(--gold))] ring-1 ring-[hsl(var(--gold))]/20",
+  SUPER_ADMIN:
+    "bg-[hsl(var(--destructive))]/10 text-[hsl(var(--destructive))] ring-1 ring-[hsl(var(--destructive))]/20",
+  WRITE_ADMIN:
+    "bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))] ring-1 ring-[hsl(var(--primary))]/20",
+  READER:
+    "bg-[hsl(var(--gold))]/10 text-[hsl(var(--gold))] ring-1 ring-[hsl(var(--gold))]/20",
 };
 
 export function Topbar() {
@@ -76,7 +80,7 @@ export function Topbar() {
               onClick={() => setTheme("light")}
               className={cn(
                 "relative z-10 flex h-7 w-7 items-center justify-center rounded-full transition-colors",
-                !isDark ? "text-primary-foreground" : "text-muted-foreground"
+                !isDark ? "text-primary-foreground" : "text-muted-foreground",
               )}
               aria-label="Light mode"
             >
@@ -86,7 +90,7 @@ export function Topbar() {
               onClick={() => setTheme("dark")}
               className={cn(
                 "relative z-10 flex h-7 w-7 items-center justify-center rounded-full transition-colors",
-                isDark ? "text-primary-foreground" : "text-muted-foreground"
+                isDark ? "text-primary-foreground" : "text-muted-foreground",
               )}
               aria-label="Dark mode"
             >
@@ -96,7 +100,7 @@ export function Topbar() {
             <span
               className={cn(
                 "absolute top-0.5 h-7 w-7 rounded-full bg-foreground transition-transform duration-200",
-                isDark ? "translate-x-7" : "translate-x-0"
+                isDark ? "translate-x-7" : "translate-x-0",
               )}
             />
           </div>
@@ -116,21 +120,25 @@ export function Topbar() {
             <div className="hidden md:flex flex-col items-start leading-tight">
               <span className="text-sm font-medium">{session?.user.name}</span>
               {session?.user.role && (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium mt-0.5 ${roleColors[session.user.role]}`}>
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded font-medium mt-0.5 ${roleColors[session.user.role]}`}
+                >
                   {roleLabels[session.user.role]}
                 </span>
               )}
             </div>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>
-              <div className="flex flex-col">
-                <span className="text-sm">{session?.user.name}</span>
-                <span className="text-xs text-muted-foreground font-normal mt-0.5">
-                  {session?.user.email}
-                </span>
-              </div>
-            </DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>
+                <div className="flex flex-col">
+                  <span className="text-sm">{session?.user.name}</span>
+                  <span className="text-xs text-muted-foreground font-normal mt-0.5">
+                    {session?.user.email}
+                  </span>
+                </div>
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem>
               <User className="h-4 w-4 mr-2" />
