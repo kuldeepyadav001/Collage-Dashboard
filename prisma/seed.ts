@@ -4,7 +4,6 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
-  // Clean existing seed data
   await prisma.user.deleteMany({
     where: {
       email: {

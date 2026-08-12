@@ -1,3 +1,11 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
 
 // ─── ENUMS ────────────────────────────────────────────
 
@@ -11,6 +19,18 @@ enum AttendanceStatus {
   PRESENT
   ABSENT
   LATE
+}
+enum PlacementStatus {
+  PLACED
+  NOT_PLACED
+  HIGHER_STUDIES
+  OPTED_OUT
+}
+
+enum PlacementType {
+  ON_CAMPUS
+  OFF_CAMPUS
+  POOL_CAMPUS
 }
 
 // ─── USERS (Faculty / Trainers / Admins) ──────────────
@@ -71,7 +91,7 @@ model Student {
   section     Section  @relation(fields: [sectionId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
+  placement   Placement?
   // relations
   eliteMemberships EliteSectionMember[]
   testMarks        TestMark[]
@@ -159,4 +179,22 @@ model AttendanceRecord {
   session             AttendanceSession @relation(fields: [attendanceSessionId], references: [id], onDelete: Cascade)
 
   @@unique([attendanceSessionId, studentId])
+}
+
+// ─── PLACEMENT ────────────────────────────────────────
+
+model Placement {
+  id            String           @id @default(cuid())
+  studentId     String           @unique  // one placement per student
+  status        PlacementStatus  @default(NOT_PLACED)
+  company       String?
+  role          String?
+  packageLpa    Float?
+  placementDate DateTime?
+  type          PlacementType?
+  notes         String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  student       Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
 }
