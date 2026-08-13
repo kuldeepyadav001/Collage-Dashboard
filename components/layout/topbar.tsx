@@ -3,6 +3,7 @@
 import { useSession, signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
 import { Input } from "@/components/ui/input";
+import { CollegeSwitcher } from "./college-switcher";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,19 +54,25 @@ export function Topbar() {
     <header className="flex h-16 items-center gap-3 border-b bg-card/60 backdrop-blur-md px-6 sticky top-0 z-10">
       {/* Year Switcher */}
       <YearSwitcher />
+      <CollegeSwitcher />
 
       {/* Search */}
       <div className="relative flex-1 max-w-md">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search students, sections, tests..."
-          className="pl-9 h-9 bg-secondary/60 border-border"
-        />
-        <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 hidden md:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-          ⌘K
-        </kbd>
-      </div>
-
+  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+  <Input
+    placeholder="Search students by name, roll, email..."
+    className="pl-9 h-9 bg-secondary/60 border-border"
+    onKeyDown={(e) => {
+      if (e.key === "Enter") {
+        const q = (e.target as HTMLInputElement).value.trim();
+        if (q) window.location.href = `/dashboard/students?q=${encodeURIComponent(q)}`;
+      }
+    }}
+  />
+  <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 hidden md:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+    ↵
+  </kbd>
+</div>
       <div className="ml-auto flex items-center gap-2">
         {/* Notifications */}
         <button className="relative flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent transition-colors">

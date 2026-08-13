@@ -16,6 +16,7 @@ import { Calendar, Check, ChevronDown } from "lucide-react";
 
 export function YearSwitcher() {
   const { selectedYear, setSelectedYear, refreshBump } = useSelectedYear();
+  
   const [years, setYears] = useState<number[]>([]);
 
   // Fetch available years from API

@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {  Building2 } from "lucide-react";
+import { useSelectedCollege } from "@/components/providers/college-provider";
 import {
   Dialog,
   DialogContent,
@@ -37,7 +39,6 @@ import { cn } from "@/lib/utils";
 import { getBatchInfo } from "@/lib/year-utils";
 import { useSelectedYear } from "@/components/providers/year-provider";
 
-
 interface Year {
   id: string;
   label: string;
@@ -58,20 +59,31 @@ interface Section {
   courseId: string;
   _count: { students: number };
 }
+interface College {
+  id: string;
+  name: string;
+  fullName: string | null;
+  _count: { students: number };
+}
 
 export default function ManagePage() {
+  
   const { data: session } = useSession();
-  const { triggerRefresh } = useSelectedYear();
+const { triggerRefresh: refreshYears } = useSelectedYear();
+const { triggerRefresh: refreshColleges } = useSelectedCollege();
   const canWrite =
-    session?.user.role === "SUPER_ADMIN" || session?.user.role === "WRITE_ADMIN";
+    session?.user.role === "SUPER_ADMIN" ||
+    session?.user.role === "WRITE_ADMIN";
 
   const [years, setYears] = useState<Year[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
   const [expandedYears, setExpandedYears] = useState<Set<string>>(new Set());
-  const [expandedCourses, setExpandedCourses] = useState<Set<string>>(new Set());
+  const [expandedCourses, setExpandedCourses] = useState<Set<string>>(
+    new Set(),
+  );
   const [loading, setLoading] = useState(true);
-  
+
   // Dialogs
   const [yearDialogOpen, setYearDialogOpen] = useState(false);
   const [courseDialogOpen, setCourseDialogOpen] = useState(false);
@@ -82,33 +94,59 @@ export default function ManagePage() {
   const [newCourse, setNewCourse] = useState({ name: "", yearId: "" });
   const [newSection, setNewSection] = useState({ name: "", courseId: "" });
 
-  async function loadData() {
-    setLoading(true);
-    try {
-      const [yRes, cRes, sRes] = await Promise.all([
-        fetch("/api/years"),
-        fetch("/api/courses"),
-        fetch("/api/sections"),
-      ]);
-      const [yData, cData, sData] = await Promise.all([
-        yRes.json(),
-        cRes.json(),
-        sRes.json(),
-      ]);
-      setYears(yData);
-      setCourses(cData);
-      setSections(sData);
-    } catch {
-      toast.error("Failed to load data");
-    } finally {
-      setLoading(false);
-    }
+const [colleges, setColleges] = useState<College[]>([]);
+const [collegeDialogOpen, setCollegeDialogOpen] = useState(false);
+const [newCollege, setNewCollege] = useState({ name: "", fullName: "" });
+ async function loadData() {
+  setLoading(true);
+  try {
+    const [yRes, cRes, sRes, colRes] = await Promise.all([
+      fetch("/api/years"),
+      fetch("/api/courses"),
+      fetch("/api/sections"),
+      fetch("/api/colleges"),                          // NEW
+    ]);
+    const [yData, cData, sData, colData] = await Promise.all([
+      yRes.json(), cRes.json(), sRes.json(), colRes.json(),
+    ]);
+    setYears(yData);
+    setCourses(cData);
+    setSections(sData);
+    setColleges(colData);                              // NEW
+  } catch {
+    toast.error("Failed to load data");
+  } finally {
+    setLoading(false);
   }
+}
 
   useEffect(() => {
     loadData();
   }, []);
+async function addCollege() {
+  const res = await fetch("/api/colleges", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(newCollege),
+  });
+  const data = await res.json();
+  if (!res.ok) return toast.error(data.error || "Failed");
+  toast.success(`College ${newCollege.name.toUpperCase()} added`);
+  setNewCollege({ name: "", fullName: "" });
+  setCollegeDialogOpen(false);
+  loadData();
+  refreshColleges();   
+}
 
+async function deleteCollege(id: string, name: string) {
+  if (!confirm(`Delete college ${name}?`)) return;
+  const res = await fetch(`/api/colleges/${id}`, { method: "DELETE" });
+  const data = await res.json();
+  if (!res.ok) return toast.error(data.error || "Failed");
+  toast.success(`College ${name} deleted`);
+  loadData();
+  refreshColleges();   
+}
   // Actions
   async function addYear() {
     const res = await fetch("/api/years", {
@@ -122,7 +160,7 @@ export default function ManagePage() {
     setNewYear("");
     setYearDialogOpen(false);
     loadData();
-    triggerRefresh(); 
+  refreshYears();   
   }
 
   async function addCourse() {
@@ -154,25 +192,31 @@ export default function ManagePage() {
   }
 
   async function deleteYear(id: string, label: string) {
-    if (!confirm(`Delete year ${label}? This removes ALL data under it.`)) return;
+    if (!confirm(`Delete year ${label}? This removes ALL data under it.`))
+      return;
     const res = await fetch(`/api/years/${id}`, { method: "DELETE" });
     if (!res.ok) return toast.error("Failed to delete");
     toast.success(`Year ${label} deleted`);
     loadData();
-    triggerRefresh(); 
+      refreshYears();   
   }
 
   async function deleteCourse(id: string, name: string) {
-    if (!confirm(`Delete course ${name}? This removes all sections and students under it.`)) return;
+    if (
+      !confirm(
+        `Delete course ${name}? This removes all sections and students under it.`,
+      )
+    )
+      return;
     const res = await fetch(`/api/courses/${id}`, { method: "DELETE" });
     if (!res.ok) return toast.error("Failed to delete");
     toast.success(`Course ${name} deleted`);
     loadData();
-    
   }
 
   async function deleteSection(id: string, name: string) {
-    if (!confirm(`Delete section ${name}? Students in it will be removed.`)) return;
+    if (!confirm(`Delete section ${name}? Students in it will be removed.`))
+      return;
     const res = await fetch(`/api/sections/${id}`, { method: "DELETE" });
     if (!res.ok) return toast.error("Failed to delete");
     toast.success(`Section ${name} deleted`);
@@ -196,7 +240,9 @@ export default function ManagePage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Manage Structure</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Manage Structure
+          </h1>
           <p className="text-sm text-muted-foreground mt-1.5">
             Add and organize years, courses, and sections
           </p>
@@ -212,19 +258,36 @@ export default function ManagePage() {
 
       {/* Quick stats */}
       <div className="grid gap-3 md:grid-cols-3">
-        <StatChip icon={Calendar} label="Years" value={years.length} color="primary" />
-        <StatChip icon={BookOpen} label="Courses" value={courses.length} color="emerald" />
-        <StatChip icon={Users} label="Sections" value={sections.length} color="gold" />
+          <StatChip icon={Building2} label="Colleges" value={colleges.length} color="primary" />
+
+        <StatChip
+          icon={Calendar}
+          label="Years"
+          value={years.length}
+          color="primary"
+        />
+        <StatChip
+          icon={BookOpen}
+          label="Courses"
+          value={courses.length}
+          color="emerald"
+        />
+        <StatChip
+          icon={Users}
+          label="Sections"
+          value={sections.length}
+          color="gold"
+        />
       </div>
 
       {/* Add buttons */}
       {canWrite && (
         <div className="flex gap-2 flex-wrap">
           <Dialog open={yearDialogOpen} onOpenChange={setYearDialogOpen}>
-           <DialogTrigger className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-  <Plus className="h-4 w-4" />
-  Add Year
-</DialogTrigger>
+            <DialogTrigger className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+              <Plus className="h-4 w-4" />
+              Add Year
+            </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add Admission Year</DialogTitle>
@@ -242,7 +305,10 @@ export default function ManagePage() {
                 />
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setYearDialogOpen(false)}>
+                <Button
+                  variant="outline"
+                  onClick={() => setYearDialogOpen(false)}
+                >
                   Cancel
                 </Button>
                 <Button onClick={addYear} disabled={!newYear.trim()}>
@@ -252,14 +318,51 @@ export default function ManagePage() {
             </DialogContent>
           </Dialog>
 
+<Dialog open={collegeDialogOpen} onOpenChange={setCollegeDialogOpen}>
+  <DialogTrigger className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+    <Plus className="h-4 w-4" />
+    Add College
+  </DialogTrigger>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Add College</DialogTitle>
+      <DialogDescription>
+        Add an affiliated college (e.g., MIPS, MPEC)
+      </DialogDescription>
+    </DialogHeader>
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label>Short Name *</Label>
+        <Input
+          placeholder="MIPS"
+          value={newCollege.name}
+          onChange={(e) => setNewCollege({ ...newCollege, name: e.target.value })}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>Full Name</Label>
+        <Input
+          placeholder="Meerut Institute of Professional Studies"
+          value={newCollege.fullName}
+          onChange={(e) => setNewCollege({ ...newCollege, fullName: e.target.value })}
+        />
+      </div>
+    </div>
+    <DialogFooter>
+      <Button variant="outline" onClick={() => setCollegeDialogOpen(false)}>Cancel</Button>
+      <Button onClick={addCollege} disabled={!newCollege.name.trim()}>Add College</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+
           <Dialog open={courseDialogOpen} onOpenChange={setCourseDialogOpen}>
             <DialogTrigger
-  disabled={years.length === 0}
-  className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
->
-  <Plus className="h-4 w-4" />
-  Add Course
-</DialogTrigger>
+              disabled={years.length === 0}
+              className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Plus className="h-4 w-4" />
+              Add Course
+            </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add Course</DialogTitle>
@@ -272,10 +375,14 @@ export default function ManagePage() {
                   <Label>Year</Label>
                   <Select
                     value={newCourse.yearId}
-                    onValueChange={(v) => setNewCourse({ ...newCourse, yearId: v })}
+                    onValueChange={(v) =>
+                      setNewCourse({ ...newCourse, yearId: v })
+                    }
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select year" />
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select year">
+                        {years.find((y) => y.id === newCourse.yearId)?.label}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {years.map((y) => (
@@ -291,15 +398,23 @@ export default function ManagePage() {
                   <Input
                     placeholder="BTech"
                     value={newCourse.name}
-                    onChange={(e) => setNewCourse({ ...newCourse, name: e.target.value })}
+                    onChange={(e) =>
+                      setNewCourse({ ...newCourse, name: e.target.value })
+                    }
                   />
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setCourseDialogOpen(false)}>
+                <Button
+                  variant="outline"
+                  onClick={() => setCourseDialogOpen(false)}
+                >
                   Cancel
                 </Button>
-                <Button onClick={addCourse} disabled={!newCourse.name.trim() || !newCourse.yearId}>
+                <Button
+                  onClick={addCourse}
+                  disabled={!newCourse.name.trim() || !newCourse.yearId}
+                >
                   Add Course
                 </Button>
               </DialogFooter>
@@ -308,12 +423,12 @@ export default function ManagePage() {
 
           <Dialog open={sectionDialogOpen} onOpenChange={setSectionDialogOpen}>
             <DialogTrigger
-  disabled={courses.length === 0}
-  className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
->
-  <Plus className="h-4 w-4" />
-  Add Section
-</DialogTrigger>
+              disabled={courses.length === 0}
+              className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Plus className="h-4 w-4" />
+              Add Section
+            </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add Section</DialogTitle>
@@ -326,12 +441,21 @@ export default function ManagePage() {
                   <Label>Course</Label>
                   <Select
                     value={newSection.courseId}
-                    onValueChange={(v) => setNewSection({ ...newSection, courseId: v })}
+                    onValueChange={(v) =>
+                      setNewSection({ ...newSection, courseId: v })
+                    }
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select course" />
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select course">
+                        {(() => {
+                          const c = courses.find(
+                            (c) => c.id === newSection.courseId,
+                          );
+                          return c ? `${c.year.label} · ${c.name}` : null;
+                        })()}
+                      </SelectValue>
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="w-[--radix-select-trigger-width] min-w-[280px]">
                       {courses.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
                           {c.year.label} · {c.name}
@@ -345,15 +469,23 @@ export default function ManagePage() {
                   <Input
                     placeholder="A"
                     value={newSection.name}
-                    onChange={(e) => setNewSection({ ...newSection, name: e.target.value })}
+                    onChange={(e) =>
+                      setNewSection({ ...newSection, name: e.target.value })
+                    }
                   />
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setSectionDialogOpen(false)}>
+                <Button
+                  variant="outline"
+                  onClick={() => setSectionDialogOpen(false)}
+                >
                   Cancel
                 </Button>
-                <Button onClick={addSection} disabled={!newSection.name.trim() || !newSection.courseId}>
+                <Button
+                  onClick={addSection}
+                  disabled={!newSection.name.trim() || !newSection.courseId}
+                >
                   Add Section
                 </Button>
               </DialogFooter>
@@ -362,6 +494,59 @@ export default function ManagePage() {
         </div>
       )}
 
+{/* Colleges Card */}
+<Card>
+  <CardHeader className="flex flex-row items-center justify-between">
+    <CardTitle className="text-base">Colleges</CardTitle>
+    <span className="text-xs text-muted-foreground">
+      {colleges.length} {colleges.length === 1 ? "college" : "colleges"}
+    </span>
+  </CardHeader>
+  <CardContent>
+    {colleges.length === 0 ? (
+      <div className="py-8 text-center">
+        <div className="inline-flex p-3 rounded-full bg-muted mb-3">
+          <Building2 className="h-5 w-5 text-muted-foreground" />
+        </div>
+        <p className="text-sm font-medium">No colleges yet</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {canWrite ? "Add a college to get started" : "Ask admin to add colleges"}
+        </p>
+      </div>
+    ) : (
+      <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+        {colleges.map((c) => (
+          <div
+            key={c.id}
+            className="flex items-center gap-3 rounded-lg border p-3 group hover:border-primary/40 transition-colors"
+          >
+            <div className="p-2 rounded-lg bg-primary/10 text-primary">
+              <Building2 className="h-4 w-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium">{c.name}</p>
+              {c.fullName && (
+                <p className="text-xs text-muted-foreground truncate">{c.fullName}</p>
+              )}
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                {c._count.students} {c._count.students === 1 ? "student" : "students"}
+              </p>
+            </div>
+            {canWrite && (
+              <button
+                onClick={() => deleteCollege(c.id, c.name)}
+                className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-destructive/10 hover:text-destructive rounded transition-all"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    )}
+  </CardContent>
+</Card>
+
       {/* Tree view */}
       <Card>
         <CardHeader>
@@ -369,7 +554,9 @@ export default function ManagePage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">Loading...</div>
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              Loading...
+            </div>
           ) : years.length === 0 ? (
             <div className="py-12 text-center">
               <div className="inline-flex p-3 rounded-full bg-muted mb-3">
@@ -377,7 +564,9 @@ export default function ManagePage() {
               </div>
               <p className="text-sm font-medium">No years yet</p>
               <p className="text-xs text-muted-foreground mt-1">
-                {canWrite ? "Click 'Add Year' to get started" : "Ask admin to add years"}
+                {canWrite
+                  ? "Click 'Add Year' to get started"
+                  : "Ask admin to add years"}
               </p>
             </div>
           ) : (
@@ -407,14 +596,17 @@ export default function ManagePage() {
                       </button>
                       <Calendar className="h-4 w-4 text-primary" />
                       <span className="font-medium text-sm">{year.label}</span>
-                      <span className="text-xs text-muted-foreground">· {info.label}</span>
+                      <span className="text-xs text-muted-foreground">
+                        · {info.label}
+                      </span>
                       {info.status === "PASSED_OUT" && (
                         <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[color:var(--gold)]/10 text-[color:var(--gold)]">
                           Alumni
                         </span>
                       )}
                       <span className="ml-auto text-xs text-muted-foreground">
-                        {year._count.courses} {year._count.courses === 1 ? "course" : "courses"}
+                        {year._count.courses}{" "}
+                        {year._count.courses === 1 ? "course" : "courses"}
                       </span>
                       {canWrite && (
                         <button
@@ -430,9 +622,11 @@ export default function ManagePage() {
                       <div className="ml-6 border-l pl-3 space-y-1 mt-1">
                         {yearCourses.map((course) => {
                           const courseSections = sections.filter(
-                            (s) => s.courseId === course.id
+                            (s) => s.courseId === course.id,
                           );
-                          const isCourseExpanded = expandedCourses.has(course.id);
+                          const isCourseExpanded = expandedCourses.has(
+                            course.id,
+                          );
 
                           return (
                             <div key={course.id}>
@@ -452,11 +646,15 @@ export default function ManagePage() {
                                 <span className="text-sm">{course.name}</span>
                                 <span className="ml-auto text-xs text-muted-foreground">
                                   {course._count.sections}{" "}
-                                  {course._count.sections === 1 ? "section" : "sections"}
+                                  {course._count.sections === 1
+                                    ? "section"
+                                    : "sections"}
                                 </span>
                                 {canWrite && (
                                   <button
-                                    onClick={() => deleteCourse(course.id, course.name)}
+                                    onClick={() =>
+                                      deleteCourse(course.id, course.name)
+                                    }
                                     className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/10 hover:text-destructive rounded transition-all"
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
@@ -473,14 +671,23 @@ export default function ManagePage() {
                                     >
                                       <div className="w-4" />
                                       <Users className="h-4 w-4 text-[color:var(--gold)]" />
-                                      <span className="text-sm">{section.name}</span>
+                                      <span className="text-sm">
+                                        {section.name}
+                                      </span>
                                       <span className="ml-auto text-xs text-muted-foreground">
                                         {section._count.students}{" "}
-                                        {section._count.students === 1 ? "student" : "students"}
+                                        {section._count.students === 1
+                                          ? "student"
+                                          : "students"}
                                       </span>
                                       {canWrite && (
                                         <button
-                                          onClick={() => deleteSection(section.id, section.name)}
+                                          onClick={() =>
+                                            deleteSection(
+                                              section.id,
+                                              section.name,
+                                            )
+                                          }
                                           className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/10 hover:text-destructive rounded transition-all"
                                         >
                                           <Trash2 className="h-3.5 w-3.5" />
