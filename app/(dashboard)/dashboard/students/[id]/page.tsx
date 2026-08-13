@@ -38,7 +38,8 @@ export default async function StudentProfilePage({
         include: {
           course: { include: { year: true } },
         },
-      },
+      },    
+      college: true, 
       eliteMemberships: {
         include: { eliteSection: true },
       },

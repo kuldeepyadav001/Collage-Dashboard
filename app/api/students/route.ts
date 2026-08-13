@@ -8,16 +8,17 @@ export async function GET(req: Request) {
   if (error) return error;
 
   const { searchParams } = new URL(req.url);
-  const yearLabel = searchParams.get("year");       // "2024"
+  const yearLabel = searchParams.get("year");
+  const collegeId = searchParams.get("collegeId");
   const courseId = searchParams.get("courseId");
   const sectionId = searchParams.get("sectionId");
-  const search = searchParams.get("q");             // search query
- const collegeId = searchParams.get("collegeId");   // search query
+  const search = searchParams.get("q");
+
   const students = await prisma.student.findMany({
     where: {
       AND: [
         sectionId ? { sectionId } : {},
-        collegeId ? { collegeId } : {}, 
+        collegeId ? { collegeId } : {},
         courseId ? { section: { courseId } } : {},
         yearLabel ? { section: { course: { year: { label: yearLabel } } } } : {},
         search
@@ -39,12 +40,14 @@ export async function GET(req: Request) {
           },
         },
       },
+      college: true,                                    // ← MUST BE HERE
     },
     orderBy: [{ section: { name: "asc" } }, { rollNumber: "asc" }],
   });
 
   return NextResponse.json(students);
 }
+
 
 // POST — create new student
 export async function POST(req: Request) {

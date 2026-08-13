@@ -56,10 +56,12 @@ model College {
 // ─── ACADEMIC STRUCTURE ───────────────────────────────
 
 model Year {
-  id        String   @id @default(cuid())
-  label     String   @unique  // "2024", "2025"
-  createdAt DateTime @default(now())
-  courses   Course[]
+  id            String         @id @default(cuid())
+  label         String         @unique
+  createdAt     DateTime       @default(now())
+  courses       Course[]
+  eliteSections EliteSection[]                   // NEW
+  tests         Test[]                           // NEW
 }
 
 model Course {
@@ -111,14 +113,18 @@ model Student {
 
 model EliteSection {
   id          String   @id @default(cuid())
-  name        String   @unique               // "Service Based", "Production Based"
+  name        String                              // just "Service Based"
   description String?
+  yearId      String                              // NEW
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  year        Year     @relation(fields: [yearId], references: [id], onDelete: Cascade)   // NEW
   members     EliteSectionMember[]
   tests       Test[]
   attendance  AttendanceSession[]
+
+  @@unique([name, yearId])                        // same name allowed in different years
 }
 
 model EliteSectionMember {
@@ -140,14 +146,16 @@ model Test {
   name           String
   date           DateTime
   maxMarks       Float
-  // belongs to either a regular section OR an elite section
+  yearId         String                          // NEW
   sectionId      String?
   eliteSectionId String?
 
+  year           Year          @relation(fields: [yearId], references: [id], onDelete: Cascade)   // NEW
   section        Section?      @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   eliteSection   EliteSection? @relation(fields: [eliteSectionId], references: [id], onDelete: Cascade)
   marks          TestMark[]
   createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt        // NEW
 }
 
 model TestMark {

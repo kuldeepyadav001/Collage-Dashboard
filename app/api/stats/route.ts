@@ -31,21 +31,26 @@ export async function GET(req: Request) {
     placementWhere.student = {};
     if (collegeId) placementWhere.student.collegeId = collegeId;
     if (yearLabel) {
-      placementWhere.student.section = { course: { year: { label: yearLabel } } };
+      placementWhere.student.section = {
+        course: { year: { label: yearLabel } },
+      };
     }
   }
 
-  const [studentCount, sectionCount, eliteCount, placementAgg] = await Promise.all([
-    prisma.student.count({ where: studentWhere }),
-    prisma.section.count({ where: sectionWhere }),
-    prisma.eliteSection.count(),
-    prisma.placement.aggregate({
-      where: placementWhere,
-      _count: { id: true },
-      _avg: { packageLpa: true },
-      _max: { packageLpa: true },
-    }),
-  ]);
+  const [studentCount, sectionCount, eliteCount, placementAgg] =
+    await Promise.all([
+      prisma.student.count({ where: studentWhere }),
+      prisma.section.count({ where: sectionWhere }),
+      prisma.eliteSection.count({
+        where: yearLabel ? { year: { label: yearLabel } } : undefined,
+      }),
+      prisma.placement.aggregate({
+        where: placementWhere,
+        _count: { id: true },
+        _avg: { packageLpa: true },
+        _max: { packageLpa: true },
+      }),
+    ]);
 
   return NextResponse.json({
     studentCount,
