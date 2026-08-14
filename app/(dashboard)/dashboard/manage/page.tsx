@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {  Building2 } from "lucide-react";
+import { Building2 } from "lucide-react";
 import { useSelectedCollege } from "@/components/providers/college-provider";
 import {
   Dialog,
@@ -38,7 +38,7 @@ import {
 import { cn } from "@/lib/utils";
 import { getBatchInfo } from "@/lib/year-utils";
 import { useSelectedYear } from "@/components/providers/year-provider";
-
+import { Pencil } from "lucide-react";
 interface Year {
   id: string;
   label: string;
@@ -67,13 +67,23 @@ interface College {
 }
 
 export default function ManagePage() {
-  
   const { data: session } = useSession();
-const { triggerRefresh: refreshYears } = useSelectedYear();
-const { triggerRefresh: refreshColleges } = useSelectedCollege();
+  const { triggerRefresh: refreshYears } = useSelectedYear();
+  const { triggerRefresh: refreshColleges } = useSelectedCollege();
   const canWrite =
     session?.user.role === "SUPER_ADMIN" ||
     session?.user.role === "WRITE_ADMIN";
+
+  const [editTarget, setEditTarget] = useState<
+    | { type: "year"; id: string; value: string }
+    | { type: "course"; id: string; value: string }
+    | { type: "section"; id: string; value: string }
+    | { type: "college"; id: string; value: string; fullName?: string }
+    | null
+  >(null);
+  const [editValue, setEditValue] = useState("");
+  const [editFullName, setEditFullName] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
 
   const [years, setYears] = useState<Year[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -94,59 +104,120 @@ const { triggerRefresh: refreshColleges } = useSelectedCollege();
   const [newCourse, setNewCourse] = useState({ name: "", yearId: "" });
   const [newSection, setNewSection] = useState({ name: "", courseId: "" });
 
-const [colleges, setColleges] = useState<College[]>([]);
-const [collegeDialogOpen, setCollegeDialogOpen] = useState(false);
-const [newCollege, setNewCollege] = useState({ name: "", fullName: "" });
- async function loadData() {
-  setLoading(true);
-  try {
-    const [yRes, cRes, sRes, colRes] = await Promise.all([
-      fetch("/api/years"),
-      fetch("/api/courses"),
-      fetch("/api/sections"),
-      fetch("/api/colleges"),                          // NEW
-    ]);
-    const [yData, cData, sData, colData] = await Promise.all([
-      yRes.json(), cRes.json(), sRes.json(), colRes.json(),
-    ]);
-    setYears(yData);
-    setCourses(cData);
-    setSections(sData);
-    setColleges(colData);                              // NEW
-  } catch {
-    toast.error("Failed to load data");
-  } finally {
-    setLoading(false);
+  const [colleges, setColleges] = useState<College[]>([]);
+  const [collegeDialogOpen, setCollegeDialogOpen] = useState(false);
+  const [newCollege, setNewCollege] = useState({ name: "", fullName: "" });
+
+  async function saveEdit() {
+    if (!editTarget) return;
+    setEditSaving(true);
+
+    const urlMap = {
+      year: `/api/years/${editTarget.id}`,
+      course: `/api/courses/${editTarget.id}`,
+      section: `/api/sections/${editTarget.id}`,
+      college: `/api/colleges/${editTarget.id}`,
+    };
+
+    const bodyMap: Record<string, any> = {
+      year: { label: editValue },
+      course: { name: editValue },
+      section: { name: editValue },
+      college: { name: editValue, fullName: editFullName },
+    };
+
+    const res = await fetch(urlMap[editTarget.type], {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(bodyMap[editTarget.type]),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      toast.error(data.error || "Failed");
+      setEditSaving(false);
+      return;
+    }
+
+    toast.success("Updated");
+    setEditTarget(null);
+    setEditValue("");
+    setEditFullName("");
+    setEditSaving(false);
+    loadData();
+    if (editTarget.type === "year") refreshYears();
+    if (editTarget.type === "college") refreshColleges();
   }
-}
+
+  function openEdit(
+    type: "year" | "course" | "section" | "college",
+    id: string,
+    value: string,
+    fullName?: string,
+  ) {
+    setEditTarget({
+      type,
+      id,
+      value,
+      ...(fullName !== undefined && { fullName }),
+    });
+    setEditValue(value);
+    setEditFullName(fullName || "");
+  }
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      const [yRes, cRes, sRes, colRes] = await Promise.all([
+        fetch("/api/years"),
+        fetch("/api/courses"),
+        fetch("/api/sections"),
+        fetch("/api/colleges"), // NEW
+      ]);
+      const [yData, cData, sData, colData] = await Promise.all([
+        yRes.json(),
+        cRes.json(),
+        sRes.json(),
+        colRes.json(),
+      ]);
+      setYears(yData);
+      setCourses(cData);
+      setSections(sData);
+      setColleges(colData); // NEW
+    } catch {
+      toast.error("Failed to load data");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     loadData();
   }, []);
-async function addCollege() {
-  const res = await fetch("/api/colleges", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(newCollege),
-  });
-  const data = await res.json();
-  if (!res.ok) return toast.error(data.error || "Failed");
-  toast.success(`College ${newCollege.name.toUpperCase()} added`);
-  setNewCollege({ name: "", fullName: "" });
-  setCollegeDialogOpen(false);
-  loadData();
-  refreshColleges();   
-}
+  async function addCollege() {
+    const res = await fetch("/api/colleges", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newCollege),
+    });
+    const data = await res.json();
+    if (!res.ok) return toast.error(data.error || "Failed");
+    toast.success(`College ${newCollege.name.toUpperCase()} added`);
+    setNewCollege({ name: "", fullName: "" });
+    setCollegeDialogOpen(false);
+    loadData();
+    refreshColleges();
+  }
 
-async function deleteCollege(id: string, name: string) {
-  if (!confirm(`Delete college ${name}?`)) return;
-  const res = await fetch(`/api/colleges/${id}`, { method: "DELETE" });
-  const data = await res.json();
-  if (!res.ok) return toast.error(data.error || "Failed");
-  toast.success(`College ${name} deleted`);
-  loadData();
-  refreshColleges();   
-}
+  async function deleteCollege(id: string, name: string) {
+    if (!confirm(`Delete college ${name}?`)) return;
+    const res = await fetch(`/api/colleges/${id}`, { method: "DELETE" });
+    const data = await res.json();
+    if (!res.ok) return toast.error(data.error || "Failed");
+    toast.success(`College ${name} deleted`);
+    loadData();
+    refreshColleges();
+  }
   // Actions
   async function addYear() {
     const res = await fetch("/api/years", {
@@ -160,7 +231,7 @@ async function deleteCollege(id: string, name: string) {
     setNewYear("");
     setYearDialogOpen(false);
     loadData();
-  refreshYears();   
+    refreshYears();
   }
 
   async function addCourse() {
@@ -198,7 +269,7 @@ async function deleteCollege(id: string, name: string) {
     if (!res.ok) return toast.error("Failed to delete");
     toast.success(`Year ${label} deleted`);
     loadData();
-      refreshYears();   
+    refreshYears();
   }
 
   async function deleteCourse(id: string, name: string) {
@@ -258,7 +329,12 @@ async function deleteCollege(id: string, name: string) {
 
       {/* Quick stats */}
       <div className="grid gap-3 md:grid-cols-3">
-          <StatChip icon={Building2} label="Colleges" value={colleges.length} color="primary" />
+        <StatChip
+          icon={Building2}
+          label="Colleges"
+          value={colleges.length}
+          color="primary"
+        />
 
         <StatChip
           icon={Calendar}
@@ -318,42 +394,53 @@ async function deleteCollege(id: string, name: string) {
             </DialogContent>
           </Dialog>
 
-<Dialog open={collegeDialogOpen} onOpenChange={setCollegeDialogOpen}>
-  <DialogTrigger className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-    <Plus className="h-4 w-4" />
-    Add College
-  </DialogTrigger>
-  <DialogContent>
-    <DialogHeader>
-      <DialogTitle>Add College</DialogTitle>
-      <DialogDescription>
-        Add an affiliated college (e.g., MIPS, MPEC)
-      </DialogDescription>
-    </DialogHeader>
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <Label>Short Name *</Label>
-        <Input
-          placeholder="MIPS"
-          value={newCollege.name}
-          onChange={(e) => setNewCollege({ ...newCollege, name: e.target.value })}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label>Full Name</Label>
-        <Input
-          placeholder="Meerut Institute of Professional Studies"
-          value={newCollege.fullName}
-          onChange={(e) => setNewCollege({ ...newCollege, fullName: e.target.value })}
-        />
-      </div>
-    </div>
-    <DialogFooter>
-      <Button variant="outline" onClick={() => setCollegeDialogOpen(false)}>Cancel</Button>
-      <Button onClick={addCollege} disabled={!newCollege.name.trim()}>Add College</Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
+          <Dialog open={collegeDialogOpen} onOpenChange={setCollegeDialogOpen}>
+            <DialogTrigger className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+              <Plus className="h-4 w-4" />
+              Add College
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add College</DialogTitle>
+                <DialogDescription>
+                  Add an affiliated college (e.g., MIPS, MPEC)
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Short Name *</Label>
+                  <Input
+                    placeholder="MIPS"
+                    value={newCollege.name}
+                    onChange={(e) =>
+                      setNewCollege({ ...newCollege, name: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Full Name</Label>
+                  <Input
+                    placeholder="Meerut Institute of Professional Studies"
+                    value={newCollege.fullName}
+                    onChange={(e) =>
+                      setNewCollege({ ...newCollege, fullName: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setCollegeDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={addCollege} disabled={!newCollege.name.trim()}>
+                  Add College
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <Dialog open={courseDialogOpen} onOpenChange={setCourseDialogOpen}>
             <DialogTrigger
@@ -494,58 +581,75 @@ async function deleteCollege(id: string, name: string) {
         </div>
       )}
 
-{/* Colleges Card */}
-<Card>
-  <CardHeader className="flex flex-row items-center justify-between">
-    <CardTitle className="text-base">Colleges</CardTitle>
-    <span className="text-xs text-muted-foreground">
-      {colleges.length} {colleges.length === 1 ? "college" : "colleges"}
-    </span>
-  </CardHeader>
-  <CardContent>
-    {colleges.length === 0 ? (
-      <div className="py-8 text-center">
-        <div className="inline-flex p-3 rounded-full bg-muted mb-3">
-          <Building2 className="h-5 w-5 text-muted-foreground" />
-        </div>
-        <p className="text-sm font-medium">No colleges yet</p>
-        <p className="text-xs text-muted-foreground mt-1">
-          {canWrite ? "Add a college to get started" : "Ask admin to add colleges"}
-        </p>
-      </div>
-    ) : (
-      <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-        {colleges.map((c) => (
-          <div
-            key={c.id}
-            className="flex items-center gap-3 rounded-lg border p-3 group hover:border-primary/40 transition-colors"
-          >
-            <div className="p-2 rounded-lg bg-primary/10 text-primary">
-              <Building2 className="h-4 w-4" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium">{c.name}</p>
-              {c.fullName && (
-                <p className="text-xs text-muted-foreground truncate">{c.fullName}</p>
-              )}
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                {c._count.students} {c._count.students === 1 ? "student" : "students"}
+      {/* Colleges Card */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base">Colleges</CardTitle>
+          <span className="text-xs text-muted-foreground">
+            {colleges.length} {colleges.length === 1 ? "college" : "colleges"}
+          </span>
+        </CardHeader>
+        <CardContent>
+          {colleges.length === 0 ? (
+            <div className="py-8 text-center">
+              <div className="inline-flex p-3 rounded-full bg-muted mb-3">
+                <Building2 className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-medium">No colleges yet</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {canWrite
+                  ? "Add a college to get started"
+                  : "Ask admin to add colleges"}
               </p>
             </div>
-            {canWrite && (
-              <button
-                onClick={() => deleteCollege(c.id, c.name)}
-                className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-destructive/10 hover:text-destructive rounded transition-all"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
-    )}
-  </CardContent>
-</Card>
+          ) : (
+            <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+              {colleges.map((c) => (
+                <div
+                  key={c.id}
+                  className="flex items-center gap-3 rounded-lg border p-3 group hover:border-primary/40 transition-colors"
+                >
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                    <Building2 className="h-4 w-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{c.name}</p>
+                    {c.fullName && (
+                      <p className="text-xs text-muted-foreground truncate">
+                        {c.fullName}
+                      </p>
+                    )}
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {c._count.students}{" "}
+                      {c._count.students === 1 ? "student" : "students"}
+                    </p>
+                  </div>
+                  {canWrite && (
+                    <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-all">
+                      <button
+                        onClick={() =>
+                          openEdit("college", c.id, c.name, c.fullName || "")
+                        }
+                        className="p-1.5 hover:bg-accent rounded"
+                        title="Edit college"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => deleteCollege(c.id, c.name)}
+                        className="p-1.5 hover:bg-destructive/10 hover:text-destructive rounded"
+                        title="Delete college"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Tree view */}
       <Card>
@@ -609,12 +713,24 @@ async function deleteCollege(id: string, name: string) {
                         {year._count.courses === 1 ? "course" : "courses"}
                       </span>
                       {canWrite && (
-                        <button
-                          onClick={() => deleteYear(year.id, year.label)}
-                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/10 hover:text-destructive rounded transition-all"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-all">
+                          <button
+                            onClick={() =>
+                              openEdit("year", year.id, year.label)
+                            }
+                            className="p-1 hover:bg-accent rounded"
+                            title="Edit year"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => deleteYear(year.id, year.label)}
+                            className="p-1 hover:bg-destructive/10 hover:text-destructive rounded"
+                            title="Delete year"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       )}
                     </div>
 
@@ -651,14 +767,30 @@ async function deleteCollege(id: string, name: string) {
                                     : "sections"}
                                 </span>
                                 {canWrite && (
-                                  <button
-                                    onClick={() =>
-                                      deleteCourse(course.id, course.name)
-                                    }
-                                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/10 hover:text-destructive rounded transition-all"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
+                                  <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-all">
+                                    <button
+                                      onClick={() =>
+                                        openEdit(
+                                          "course",
+                                          course.id,
+                                          course.name,
+                                        )
+                                      }
+                                      className="p-1 hover:bg-accent rounded"
+                                      title="Edit course"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        deleteCourse(course.id, course.name)
+                                      }
+                                      className="p-1 hover:bg-destructive/10 hover:text-destructive rounded"
+                                      title="Delete course"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
                                 )}
                               </div>
 
@@ -681,17 +813,33 @@ async function deleteCollege(id: string, name: string) {
                                           : "students"}
                                       </span>
                                       {canWrite && (
-                                        <button
-                                          onClick={() =>
-                                            deleteSection(
-                                              section.id,
-                                              section.name,
-                                            )
-                                          }
-                                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/10 hover:text-destructive rounded transition-all"
-                                        >
-                                          <Trash2 className="h-3.5 w-3.5" />
-                                        </button>
+                                        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-all">
+                                          <button
+                                            onClick={() =>
+                                              openEdit(
+                                                "section",
+                                                section.id,
+                                                section.name,
+                                              )
+                                            }
+                                            className="p-1 hover:bg-accent rounded"
+                                            title="Edit section"
+                                          >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              deleteSection(
+                                                section.id,
+                                                section.name,
+                                              )
+                                            }
+                                            className="p-1 hover:bg-destructive/10 hover:text-destructive rounded"
+                                            title="Delete section"
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </button>
+                                        </div>
                                       )}
                                     </div>
                                   ))}
@@ -709,6 +857,71 @@ async function deleteCollege(id: string, name: string) {
           )}
         </CardContent>
       </Card>
+      {/* Edit dialog */}
+      <Dialog
+        open={!!editTarget}
+        onOpenChange={(o) => !o && setEditTarget(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Edit{" "}
+              {editTarget?.type
+                ? editTarget.type.charAt(0).toUpperCase() +
+                  editTarget.type.slice(1)
+                : ""}
+            </DialogTitle>
+            <DialogDescription>
+              {editTarget?.type === "year" &&
+                "Changing the year label updates it everywhere it's referenced."}
+              {editTarget?.type === "course" &&
+                "Changing the course name updates it for all sections and students."}
+              {editTarget?.type === "section" &&
+                "Changing the section name updates it for all students in it."}
+              {editTarget?.type === "college" &&
+                "Changing the college name updates it for all students in it."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>
+                {editTarget?.type === "year" ? "Year Label" : "Name"}
+              </Label>
+              <Input
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                placeholder={editTarget?.type === "year" ? "2025" : ""}
+                autoFocus
+              />
+            </div>
+            {editTarget?.type === "college" && (
+              <div className="space-y-2">
+                <Label>Full Name</Label>
+                <Input
+                  value={editFullName}
+                  onChange={(e) => setEditFullName(e.target.value)}
+                  placeholder="Meerut Institute of Professional Studies"
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditTarget(null)}
+              disabled={editSaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={saveEdit}
+              disabled={editSaving || !editValue.trim()}
+            >
+              {editSaving ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -38,8 +38,8 @@ export default async function StudentProfilePage({
         include: {
           course: { include: { year: true } },
         },
-      },    
-      college: true, 
+      },
+      college: true,
       eliteMemberships: {
         include: { eliteSection: true },
       },
@@ -241,6 +241,59 @@ export default async function StudentProfilePage({
             </div>
           </CardContent>
         </Card>
+        {/* Tests taken */}
+        {student.testMarks.length > 0 && (
+          <Card className="lg:col-span-3">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Test Performance</CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {student.testMarks.length} tests · Avg{" "}
+                  {(
+                    student.testMarks.reduce(
+                      (acc, m) => acc + (m.marks / m.test.maxMarks) * 100,
+                      0,
+                    ) / student.testMarks.length
+                  ).toFixed(1)}
+                  %
+                </p>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y">
+                {student.testMarks.map((m) => {
+                  const pct = (m.marks / m.test.maxMarks) * 100;
+                  return (
+                    <Link
+                      key={m.id}
+                      href={`/dashboard/tests/${m.test.id}`}
+                      className="flex items-center justify-between p-3 hover:bg-accent transition-colors"
+                    >
+                      <div>
+                        <p className="text-sm font-medium">{m.test.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(m.test.date).toLocaleDateString("en-IN", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold">
+                          {m.marks} / {m.test.maxMarks}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {pct.toFixed(0)}%
+                        </p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
