@@ -58,19 +58,22 @@ export async function POST(req: Request) {
     }
 
     // Compute combined stats per student
-    const combined = Array.from(studentMap.values())
-      .map(({ student, marksPerTest }) => {
-        const percentages = Array.from(marksPerTest.values()).map((v) => v.percentage);
-        const avgPercentage = percentages.reduce((a, b) => a + b, 0) / percentages.length;
-        return {
-          student,
-          testsAttempted: marksPerTest.size,
-          totalTests: tests.length,
-          avgPercentage,
-          marksPerTest: Object.fromEntries(marksPerTest),
-        };
-      })
-      .sort((a, b) => b.avgPercentage - a.avgPercentage);
+const combined = Array.from(studentMap.values())
+  .map(({ student, marksPerTest }) => {
+    const percentages = Array.from(marksPerTest.values()).map((v) => v.percentage);
+    const sumTaken = percentages.reduce((a, b) => a + b, 0);
+    const avgTaken = sumTaken / percentages.length;                    // when present
+    const avgAll = sumTaken / tests.length;                             // missed = 0
+    return {
+      student,
+      testsAttempted: marksPerTest.size,
+      totalTests: tests.length,
+      avgTaken,
+      avgAll,
+      marksPerTest: Object.fromEntries(marksPerTest),
+    };
+  })
+  .sort((a, b) => b.avgTaken - a.avgTaken);  // default sort by Avg Taken
 
     return NextResponse.json({
       tests: tests.map((t) => ({
