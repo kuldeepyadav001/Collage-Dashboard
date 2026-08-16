@@ -40,11 +40,11 @@ export function Sidebar() {
           <GraduationCap className="h-[18px] w-[18px] text-primary-foreground" />
         </div>
         <div className="hidden lg:flex flex-col leading-tight">
-          <span className="text-sm font-semibold tracking-tight">T&P Portal</span>
-          <span className="text-[10px] text-muted-foreground font-medium tracking-wide">
-            Faculty Dashboard
-          </span>
-        </div>
+  <span className="text-sm font-semibold tracking-tight">SutraBoard</span>
+  <span className="text-[10px] text-muted-foreground font-medium tracking-wide">
+    Faculty Dashboard
+  </span>
+</div>
       </div>
 
       {/* Nav */}
