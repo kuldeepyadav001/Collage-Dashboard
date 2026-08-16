@@ -50,19 +50,3 @@ export async function DELETE(
     return NextResponse.json({ error: "Failed to delete" }, { status: 500 });
   }
 }
-export async function DELETE(
-  _req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { error } = await requireAuth("WRITE_ADMIN");
-  if (error) return error;
-
-  const { id } = await params;
-
-  try {
-    await prisma.year.delete({ where: { id } });
-    return NextResponse.json({ success: true });
-  } catch {
-    return NextResponse.json({ error: "Failed to delete" }, { status: 500 });
-  }
-}
