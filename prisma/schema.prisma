@@ -15,15 +15,12 @@ enum Role {
   READER
 }
 
-enum AttendanceStatus {
-  PRESENT
-  ABSENT
-  LATE
-}
+
 enum PlacementStatus {
   PLACED
-  NOT_PLACED
+  INTERNSHIP
   HIGHER_STUDIES
+  NOT_PLACED
   OPTED_OUT
 }
 
@@ -122,7 +119,7 @@ model EliteSection {
   year        Year     @relation(fields: [yearId], references: [id], onDelete: Cascade)   // NEW
   members     EliteSectionMember[]
   tests       Test[]
-  attendance  AttendanceSession[]
+ 
 
   @@unique([name, yearId])                        // same name allowed in different years
 }
@@ -175,29 +172,6 @@ model TestMark {
 
 // ─── ATTENDANCE (elite sections only) ─────────────────
 
-model AttendanceSession {
-  id             String             @id @default(cuid())
-  eliteSectionId String
-  date           DateTime
-  topic          String?
-  createdAt      DateTime           @default(now())
-
-  eliteSection   EliteSection       @relation(fields: [eliteSectionId], references: [id], onDelete: Cascade)
-  records        AttendanceRecord[]
-
-  @@unique([eliteSectionId, date])        // one session per section per day
-}
-
-model AttendanceRecord {
-  id                  String            @id @default(cuid())
-  attendanceSessionId String
-  studentId           String
-  status              AttendanceStatus  @default(PRESENT)
-
-  session             AttendanceSession @relation(fields: [attendanceSessionId], references: [id], onDelete: Cascade)
-
-  @@unique([attendanceSessionId, studentId])
-}
 
 // ─── PLACEMENT ────────────────────────────────────────
 

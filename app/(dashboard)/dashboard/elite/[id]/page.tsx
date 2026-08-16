@@ -26,10 +26,12 @@ import {
   X,
   Pencil,
   Calendar,
-  Building2,
   GraduationCap,
   Loader2,
+  Upload,
 } from "lucide-react";
+import { ExportButton } from "@/components/ui/export-button";
+import { ImportMembersDialog } from "@/components/elite/import-members-dialog";
 
 interface Member {
   id: string;
@@ -64,6 +66,7 @@ export default function EliteDetailPage() {
   const { data: session } = useSession();
   const params = useParams<{ id: string }>();
   const router = useRouter();
+
   const [elite, setElite] = useState<EliteSection | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -71,6 +74,7 @@ export default function EliteDetailPage() {
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [saving, setSaving] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const canWrite =
     session?.user.role === "SUPER_ADMIN" ||
@@ -204,24 +208,37 @@ export default function EliteDetailPage() {
                   </div>
                 </div>
 
-                {canWrite && (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setEditOpen(true)}
-                      className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-md border hover:bg-accent transition-colors"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                      Edit
-                    </button>
-                    <Link
-                      href={`/dashboard/elite/${elite.id}/add-members`}
-                      className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                    >
-                      <UserPlus className="h-3.5 w-3.5" />
-                      Add Members
-                    </Link>
-                  </div>
-                )}
+                <div className="flex gap-2 flex-wrap">
+                  <ExportButton
+                    url={`/api/elite/${elite.id}/export`}
+                    label="Export"
+                  />
+                  {canWrite && (
+                    <>
+                      <button
+                        onClick={() => setEditOpen(true)}
+                        className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-md border hover:bg-accent transition-colors"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => setImportOpen(true)}
+                        className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-md border hover:bg-accent transition-colors"
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        Import
+                      </button>
+                      <Link
+                        href={`/dashboard/elite/${elite.id}/add-members`}
+                        className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                      >
+                        <UserPlus className="h-3.5 w-3.5" />
+                        Add Members
+                      </Link>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -255,7 +272,7 @@ export default function EliteDetailPage() {
                 <p className="text-sm font-medium">No members yet</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {canWrite
-                    ? "Click 'Add Members' to add students"
+                    ? "Click 'Add Members' or 'Import' to add students"
                     : "Members haven't been added yet"}
                 </p>
               </div>
@@ -367,6 +384,15 @@ export default function EliteDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Import members dialog */}
+      <ImportMembersDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        eliteId={elite.id}
+        eliteName={elite.name}
+        onImported={loadData}
+      />
     </div>
   );
 }

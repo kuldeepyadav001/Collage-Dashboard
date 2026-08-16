@@ -12,6 +12,7 @@ import {
   Settings,
   GraduationCap,
   Briefcase,
+  Upload
 } from "lucide-react";
 
 const navItems = [
@@ -19,12 +20,13 @@ const navItems = [
   { label: "Students", href: "/dashboard/students", icon: Users },
   { label: "Elite Sections", href: "/dashboard/elite", icon: Sparkles },
   { label: "Tests", href: "/dashboard/tests", icon: FileText },
-  { label: "Attendance", href: "/dashboard/attendance", icon: ClipboardCheck },
+ 
   { label: "Placements", href: "/dashboard/placements", icon: Briefcase },
 ];
 
 const adminItems = [
   { label: "Manage", href: "/dashboard/manage", icon: Settings },
+   { label: "Import Data", href: "/dashboard/import", icon: Upload },
 ];
 
 export function Sidebar() {

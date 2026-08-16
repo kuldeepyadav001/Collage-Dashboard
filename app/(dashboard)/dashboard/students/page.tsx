@@ -9,6 +9,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ExportButton } from "@/components/ui/export-button";
 import {
   Plus,
   Search,
@@ -54,7 +55,8 @@ export default function StudentsPage() {
   const searchQ = searchParams.get("q") || "";
 
   const canWrite =
-    session?.user.role === "SUPER_ADMIN" || session?.user.role === "WRITE_ADMIN";
+    session?.user.role === "SUPER_ADMIN" ||
+    session?.user.role === "WRITE_ADMIN";
 
   const [sections, setSections] = useState<Section[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -90,13 +92,16 @@ export default function StudentsPage() {
     if (selectedCollegeId) params.set("collegeId", selectedCollegeId);
     if (search) params.set("q", search);
 
-    const t = setTimeout(() => {
-      fetch(`/api/students?${params}`)
-        .then((r) => r.json())
-        .then(setStudents)
-        .catch(() => setStudents([]))
-        .finally(() => setLoading(false));
-    }, search ? 300 : 0);
+    const t = setTimeout(
+      () => {
+        fetch(`/api/students?${params}`)
+          .then((r) => r.json())
+          .then(setStudents)
+          .catch(() => setStudents([]))
+          .finally(() => setLoading(false));
+      },
+      search ? 300 : 0,
+    );
 
     return () => clearTimeout(t);
   }, [sectionId, selectedYear, selectedCollegeId, search]);
@@ -115,18 +120,21 @@ export default function StudentsPage() {
   }, [sectionId]);
 
   // Group sections by course
-  const groupedSections = sections.reduce((acc, s) => {
-    const key = `${s.course.year.label}__${s.course.name}`;
-    if (!acc[key]) {
-      acc[key] = {
-        year: s.course.year.label,
-        course: s.course.name,
-        sections: [],
-      };
-    }
-    acc[key].sections.push(s);
-    return acc;
-  }, {} as Record<string, { year: string; course: string; sections: Section[] }>);
+  const groupedSections = sections.reduce(
+    (acc, s) => {
+      const key = `${s.course.year.label}__${s.course.name}`;
+      if (!acc[key]) {
+        acc[key] = {
+          year: s.course.year.label,
+          course: s.course.name,
+          sections: [],
+        };
+      }
+      acc[key].sections.push(s);
+      return acc;
+    },
+    {} as Record<string, { year: string; course: string; sections: Section[] }>,
+  );
 
   // Section detail view (when sectionId in URL)
   if (sectionId) {
@@ -152,15 +160,23 @@ export default function StudentsPage() {
               {selectedCollegeId && ` · filtered by college`}
             </p>
           </div>
-          {canWrite && (
-            <Link
-              href="/dashboard/students/new"
-              className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Add Student
-            </Link>
-          )}
+          <div className="flex gap-2">
+            {selectedSection && (
+              <ExportButton
+                url={`/api/sections/${sectionId}/export`}
+                label="Export"
+              />
+            )}
+            {canWrite && (
+              <Link
+                href="/dashboard/students/new"
+                className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                Add Student
+              </Link>
+            )}
+          </div>
         </div>
 
         <StudentList
@@ -179,7 +195,9 @@ export default function StudentsPage() {
       <div className="space-y-6">
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Search results</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Search results
+            </h1>
             <p className="text-sm text-muted-foreground mt-1.5">
               Searching for "{search}"
             </p>
@@ -251,7 +269,9 @@ export default function StudentsPage() {
 
       {/* Section groups */}
       {loading ? (
-        <div className="py-12 text-center text-sm text-muted-foreground">Loading...</div>
+        <div className="py-12 text-center text-sm text-muted-foreground">
+          Loading...
+        </div>
       ) : sections.length === 0 ? (
         <Card>
           <CardContent className="py-16 text-center">
@@ -260,7 +280,9 @@ export default function StudentsPage() {
             </div>
             <p className="text-sm font-medium">No sections found</p>
             <p className="text-xs text-muted-foreground mt-1">
-              {canWrite ? "Add sections from Manage first" : "Ask admin to add sections"}
+              {canWrite
+                ? "Add sections from Manage first"
+                : "Ask admin to add sections"}
             </p>
           </CardContent>
         </Card>
@@ -270,7 +292,9 @@ export default function StudentsPage() {
             <div key={key}>
               <div className="flex items-baseline gap-2 mb-3">
                 <h2 className="text-sm font-semibold">{group.course}</h2>
-                <span className="text-xs text-muted-foreground">· {group.year}</span>
+                <span className="text-xs text-muted-foreground">
+                  · {group.year}
+                </span>
               </div>
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 {group.sections.map((s) => (
@@ -285,7 +309,8 @@ export default function StudentsPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold">Section {s.name}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {s._count.students} {s._count.students === 1 ? "student" : "students"}
+                        {s._count.students}{" "}
+                        {s._count.students === 1 ? "student" : "students"}
                       </p>
                     </div>
                     <ArrowUpRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -315,7 +340,9 @@ function StudentList({
     <Card>
       <CardContent className="p-0">
         {loading ? (
-          <div className="py-12 text-center text-sm text-muted-foreground">Loading...</div>
+          <div className="py-12 text-center text-sm text-muted-foreground">
+            Loading...
+          </div>
         ) : students.length === 0 ? (
           <div className="py-16 text-center">
             <div className="inline-flex p-3 rounded-full bg-muted mb-3">
@@ -323,7 +350,11 @@ function StudentList({
             </div>
             <p className="text-sm font-medium">No students found</p>
             <p className="text-xs text-muted-foreground mt-1">
-              {search ? "Try a different search" : canWrite ? "Add students from the button above" : "Ask admin to add students"}
+              {search
+                ? "Try a different search"
+                : canWrite
+                  ? "Add students from the button above"
+                  : "Ask admin to add students"}
             </p>
           </div>
         ) : (

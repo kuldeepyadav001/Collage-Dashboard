@@ -29,7 +29,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
+import { ExportButton } from "@/components/ui/export-button";
 interface Student {
   id: string;
   name: string;
@@ -67,12 +67,19 @@ export default function TestDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
-  const [dirtyMarks, setDirtyMarks] = useState<Map<string, number | null>>(new Map());
+  const [dirtyMarks, setDirtyMarks] = useState<Map<string, number | null>>(
+    new Map(),
+  );
   const [editOpen, setEditOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ name: "", date: "", maxMarks: "" });
+  const [editForm, setEditForm] = useState({
+    name: "",
+    date: "",
+    maxMarks: "",
+  });
 
   const canWrite =
-    session?.user.role === "SUPER_ADMIN" || session?.user.role === "WRITE_ADMIN";
+    session?.user.role === "SUPER_ADMIN" ||
+    session?.user.role === "WRITE_ADMIN";
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -143,7 +150,9 @@ export default function TestDetailPage() {
       setSaving(false);
       return;
     }
-    toast.success(`Saved ${dirtyMarks.size} ${dirtyMarks.size === 1 ? "mark" : "marks"}`);
+    toast.success(
+      `Saved ${dirtyMarks.size} ${dirtyMarks.size === 1 ? "mark" : "marks"}`,
+    );
     setSaving(false);
     loadData();
   }
@@ -175,7 +184,7 @@ export default function TestDetailPage() {
         (s) =>
           s.name.toLowerCase().includes(q) ||
           s.rollNumber.toLowerCase().includes(q) ||
-          s.email.toLowerCase().includes(q)
+          s.email.toLowerCase().includes(q),
       );
     }
     // Sort: students with marks first (by marks desc), then without
@@ -191,7 +200,9 @@ export default function TestDetailPage() {
 
   if (loading) {
     return (
-      <div className="py-12 text-center text-sm text-muted-foreground">Loading...</div>
+      <div className="py-12 text-center text-sm text-muted-foreground">
+        Loading...
+      </div>
     );
   }
   if (!test) return null;
@@ -220,7 +231,9 @@ export default function TestDetailPage() {
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div>
               <div className="flex items-baseline gap-2 flex-wrap">
-                <h1 className="text-2xl font-semibold tracking-tight">{test.name}</h1>
+                <h1 className="text-2xl font-semibold tracking-tight">
+                  {test.name}
+                </h1>
                 <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
                   {test.year.label}
                 </span>
@@ -237,15 +250,23 @@ export default function TestDetailPage() {
                 <span>Max Marks: {test.maxMarks}</span>
               </div>
             </div>
-            {canWrite && (
-              <button
-                onClick={() => setEditOpen(true)}
-                className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-md border hover:bg-accent transition-colors"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                Edit
-              </button>
-            )}
+
+            <div className="flex gap-2">
+              <ExportButton
+                url={`/api/tests/${test.id}/export`}
+                label="Export"
+              />
+
+              {canWrite && (
+                <button
+                  onClick={() => setEditOpen(true)}
+                  className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-md border hover:bg-accent transition-colors"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  Edit
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Stats bar */}
@@ -344,7 +365,7 @@ export default function TestDetailPage() {
                     key={s.id}
                     className={cn(
                       "flex items-center gap-3 p-3 hover:bg-accent transition-colors group",
-                      isDirty && "bg-primary/5"
+                      isDirty && "bg-primary/5",
                     )}
                   >
                     <div className="w-8 text-center">
@@ -352,15 +373,18 @@ export default function TestDetailPage() {
                         <span
                           className={cn(
                             "inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold",
-                            rank === 1 && "bg-[color:var(--gold)]/20 text-[color:var(--gold)]",
+                            rank === 1 &&
+                              "bg-[color:var(--gold)]/20 text-[color:var(--gold)]",
                             rank === 2 && "bg-slate-400/20 text-slate-500",
-                            rank === 3 && "bg-orange-500/20 text-orange-600"
+                            rank === 3 && "bg-orange-500/20 text-orange-600",
                           )}
                         >
                           {rank}
                         </span>
                       ) : rank ? (
-                        <span className="text-xs text-muted-foreground">#{rank}</span>
+                        <span className="text-xs text-muted-foreground">
+                          #{rank}
+                        </span>
                       ) : null}
                     </div>
                     <Avatar className="h-8 w-8">
@@ -379,7 +403,8 @@ export default function TestDetailPage() {
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground truncate mt-0.5">
-                        {s.rollNumber} · {s.section.course.name} · Sec {s.section.name}
+                        {s.rollNumber} · {s.section.course.name} · Sec{" "}
+                        {s.section.name}
                       </p>
                     </Link>
                     <div className="flex items-center gap-2">
@@ -432,7 +457,9 @@ export default function TestDetailPage() {
               <Label>Name</Label>
               <Input
                 value={editForm.name}
-                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, name: e.target.value })
+                }
               />
             </div>
             <div className="grid gap-4 md:grid-cols-2">
@@ -441,7 +468,9 @@ export default function TestDetailPage() {
                 <Input
                   type="date"
                   value={editForm.date}
-                  onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, date: e.target.value })
+                  }
                 />
               </div>
               <div className="space-y-2">

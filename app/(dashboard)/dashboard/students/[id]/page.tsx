@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { getBatchInfo } from "@/lib/year-utils";
 import { DeleteStudentButton } from "@/components/students/delete-student-button";
-
+import { StudentPlacementEditor } from "@/components/placements/student-placement-editor";
 export default async function StudentProfilePage({
   params,
 }: {
@@ -217,28 +217,46 @@ export default async function StudentProfilePage({
               )}
             </div>
 
-            <div>
-              <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1.5">
-                <Briefcase className="h-3.5 w-3.5" />
-                Placement
-              </p>
-              {student.placement ? (
-                <div className="text-xs">
-                  <p className="font-medium">
-                    {student.placement.company || student.placement.status}
-                  </p>
-                  {student.placement.packageLpa && (
-                    <p className="text-muted-foreground">
-                      ₹ {student.placement.packageLpa} LPA
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground italic">
-                  Not tracked yet
-                </p>
-              )}
-            </div>
+         <div>
+  <div className="flex items-center justify-between mb-1.5">
+    <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+      <Briefcase className="h-3.5 w-3.5" />
+      Placement
+    </p>
+    <StudentPlacementEditor
+      studentId={student.id}
+      studentName={student.name}
+      existing={student.placement}
+    />
+  </div>
+  {student.placement ? (
+    <div className="text-xs space-y-0.5">
+      {student.placement.status === "PLACED" && student.placement.company ? (
+        <>
+          <p className="font-medium">{student.placement.company}</p>
+          {student.placement.role && (
+            <p className="text-muted-foreground">{student.placement.role}</p>
+          )}
+          {student.placement.packageLpa && (
+            <p className="text-[color:var(--gold)] font-medium">
+              ₹ {student.placement.packageLpa} LPA
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="font-medium">
+          {student.placement.status === "HIGHER_STUDIES"
+            ? "Higher Studies"
+            : student.placement.status === "OPTED_OUT"
+              ? "Opted Out"
+              : "Not Placed"}
+        </p>
+      )}
+    </div>
+  ) : (
+    <p className="text-xs text-muted-foreground italic">Not tracked yet</p>
+  )}
+</div>
           </CardContent>
         </Card>
         {/* Tests taken */}

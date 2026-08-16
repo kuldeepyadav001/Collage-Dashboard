@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ArrowLeft, BarChart3, Trophy, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+import { Download, Loader2 } from "lucide-react";
 interface TestSummary {
   id: string;
   name: string;
@@ -74,6 +75,55 @@ export default function ComparePage() {
     return sortBy === "taken" ? b.avgTaken - a.avgTaken : b.avgAll - a.avgAll;
   });
 
+function CompareExportButton({ tests }: { tests: TestSummary[] }) {
+  const [loading, setLoading] = useState(false);
+
+  async function download() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/tests/compare/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ testIds: tests.map((t) => t.id) }),
+      });
+      if (!res.ok) {
+        toast.error("Export failed");
+        return;
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition");
+      const match = cd?.match(/filename="?([^"]+)"?/);
+      const filename = match?.[1] || "comparison.xlsx";
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Downloaded");
+    } catch {
+      toast.error("Download failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={download}
+      disabled={loading || tests.length < 2}
+      className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-md border hover:bg-accent transition-colors disabled:opacity-50"
+    >
+      {loading ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <Download className="h-3.5 w-3.5" />
+      )}
+      Export Excel
+    </button>
+  );
+}
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -89,14 +139,15 @@ export default function ComparePage() {
           <div className="p-2 rounded-lg bg-primary/10 text-primary">
             <BarChart3 className="h-4 w-4" />
           </div>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Test Comparison
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Combined performance across {tests.length} tests
-            </p>
-          </div>
+         <div className="flex items-start justify-between gap-4 flex-wrap">
+  <div>
+    <h1 className="text-2xl font-semibold tracking-tight">Test Comparison</h1>
+    <p className="text-sm text-muted-foreground mt-1">
+      Combined performance across {tests.length} tests
+    </p>
+  </div>
+  <CompareExportButton tests={tests} />
+</div>
         </div>
       </div>
 
