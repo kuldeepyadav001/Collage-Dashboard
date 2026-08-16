@@ -463,7 +463,7 @@ export default function ManagePage() {
                   <Select
                     value={newCourse.yearId}
                     onValueChange={(v) =>
-                      setNewCourse({ ...newCourse, yearId: v })
+                      setNewCourse({ ...newCourse, yearId: v|| "" })
                     }
                   >
                     <SelectTrigger className="w-full">
@@ -529,7 +529,7 @@ export default function ManagePage() {
                   <Select
                     value={newSection.courseId}
                     onValueChange={(v) =>
-                      setNewSection({ ...newSection, courseId: v })
+                      setNewSection({ ...newSection, courseId: v || "" })
                     }
                   >
                     <SelectTrigger className="w-full">

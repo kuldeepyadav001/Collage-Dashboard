@@ -263,7 +263,7 @@ export function PlacementDialog({
                 </div>
                 <div className="space-y-2">
                   <Label>Type</Label>
-                  <Select value={type} onValueChange={setType}>
+                  <Select value={type} onValueChange={(v)=>setType(v || "")}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select type">
                         {TYPE_OPTIONS.find((o) => o.value === type)?.label}

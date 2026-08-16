@@ -223,11 +223,20 @@ export default async function StudentProfilePage({
       <Briefcase className="h-3.5 w-3.5" />
       Placement
     </p>
-    <StudentPlacementEditor
-      studentId={student.id}
-      studentName={student.name}
-      existing={student.placement}
-    />
+   <StudentPlacementEditor
+  studentId={student.id}
+  studentName={student.name}
+  existing={
+    student.placement
+      ? {
+          ...student.placement,
+          placementDate: student.placement.placementDate
+            ? student.placement.placementDate.toISOString()
+            : null,
+        }
+      : null
+  }
+/>
   </div>
   {student.placement ? (
     <div className="text-xs space-y-0.5">

@@ -212,7 +212,7 @@ export default function AddMembersPage() {
               />
             </div>
 
-            <Select value={collegeFilter} onValueChange={setCollegeFilter}>
+            <Select value={collegeFilter} onValueChange={(v) => setCollegeFilter(v || "")}>
               <SelectTrigger className="w-[160px] h-9">
                 <SelectValue />
               </SelectTrigger>

@@ -410,7 +410,7 @@ export default function PlacementsPage() {
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <h2 className="text-base font-semibold">Students</h2>
           <div className="flex gap-2 flex-wrap">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v || "")}>
               <SelectTrigger className="w-[160px] h-9">
                 <SelectValue>
                   {statusFilter === "all"

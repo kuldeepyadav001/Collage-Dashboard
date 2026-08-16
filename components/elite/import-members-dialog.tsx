@@ -184,7 +184,7 @@ export function ImportMembersDialog({
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-2">
                 <Label className="text-xs">Default College (for new students)</Label>
-                <Select value={defaultCollegeId} onValueChange={setDefaultCollegeId}>
+                <Select value={defaultCollegeId} onValueChange={(v)=>setDefaultCollegeId(v || "")}>
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder="None">
                       {colleges.find((c) => c.id === defaultCollegeId)?.name}
@@ -201,7 +201,7 @@ export function ImportMembersDialog({
               </div>
               <div className="space-y-2">
                 <Label className="text-xs">Default Section (for new students)</Label>
-                <Select value={defaultSectionId} onValueChange={setDefaultSectionId}>
+                <Select value={defaultSectionId} onValueChange={(v)=>setDefaultSectionId(v || "")}>
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder="None">
                       {(() => {

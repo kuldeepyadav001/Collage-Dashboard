@@ -161,7 +161,7 @@ export async function POST(req: Request) {
           name: cfg.header,
           date: new Date(cfg.date),
           maxMarks: cfg.maxMarks,
-          yearId,
+          yearId: yearId!,
         },
       });
       createdTests.push({ column: col, test });

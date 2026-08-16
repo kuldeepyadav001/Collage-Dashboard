@@ -114,7 +114,7 @@ export default function NewTestPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Batch Year *</Label>
-              <Select value={yearId} onValueChange={setYearId}>
+              <Select value={yearId} onValueChange={(v) => setYearId(v|| "")}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select batch year">
                     {(() => {

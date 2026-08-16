@@ -155,7 +155,7 @@ export function StudentForm({ mode, initialData }: StudentFormProps) {
             <Label>Section *</Label>
             <Select
               value={form.sectionId}
-              onValueChange={(v) => setForm({ ...form, sectionId: v })}
+              onValueChange={(v) => setForm({ ...form, sectionId: v || "" })}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select a section">
@@ -192,7 +192,7 @@ export function StudentForm({ mode, initialData }: StudentFormProps) {
             <Label>College *</Label>
             <Select
               value={form.collegeId}
-              onValueChange={(v) => setForm({ ...form, collegeId: v })}
+              onValueChange={(v) => setForm({ ...form, collegeId: v || "" })}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select college">

@@ -3,21 +3,17 @@ import { authOptions } from "./auth";
 import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
 
-/**
- * Guard for API routes. Returns session if authorized,
- * or a NextResponse error if not.
- */
 export async function requireAuth(minRole: Role = "READER") {
   const session = await getServerSession(authOptions);
 
-  if (!session) {
+  if (!session?.user) {
     return {
       error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
       session: null,
     };
   }
 
-  const userRole = session.user.role;
+  const userRole = session.user.role as Role;
   const roleHierarchy: Record<Role, number> = {
     READER: 1,
     WRITE_ADMIN: 2,
