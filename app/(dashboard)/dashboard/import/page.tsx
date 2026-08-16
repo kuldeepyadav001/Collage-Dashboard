@@ -118,8 +118,10 @@ export default function ImportPage() {
     formData.append("mode", "preview");
 
     if (importType === "students") {
-      if (defaultCollegeId) formData.append("defaultCollegeId", defaultCollegeId);
-      if (defaultSectionId) formData.append("defaultSectionId", defaultSectionId);
+      if (defaultCollegeId)
+        formData.append("defaultCollegeId", defaultCollegeId);
+      if (defaultSectionId)
+        formData.append("defaultSectionId", defaultSectionId);
     }
 
     try {
@@ -140,7 +142,7 @@ export default function ImportPage() {
             header: h,
             date: today,
             maxMarks: 100,
-          }))
+          })),
         );
       }
     } catch (err: any) {
@@ -159,8 +161,10 @@ export default function ImportPage() {
     formData.append("mode", "commit");
 
     if (importType === "students") {
-      if (defaultCollegeId) formData.append("defaultCollegeId", defaultCollegeId);
-      if (defaultSectionId) formData.append("defaultSectionId", defaultSectionId);
+      if (defaultCollegeId)
+        formData.append("defaultCollegeId", defaultCollegeId);
+      if (defaultSectionId)
+        formData.append("defaultSectionId", defaultSectionId);
       formData.append("addUnmatched", String(addUnmatched));
     }
 
@@ -297,10 +301,18 @@ export default function ImportPage() {
 
             <div className="grid gap-3 md:grid-cols-4 pt-4 border-t">
               {result.created !== undefined && (
-                <StatBlock label="Created" value={result.created} color="emerald" />
+                <StatBlock
+                  label="Created"
+                  value={result.created}
+                  color="emerald"
+                />
               )}
               {result.updated !== undefined && (
-                <StatBlock label="Updated" value={result.updated} color="primary" />
+                <StatBlock
+                  label="Updated"
+                  value={result.updated}
+                  color="primary"
+                />
               )}
               {result.testsCreated !== undefined && (
                 <StatBlock
@@ -317,7 +329,11 @@ export default function ImportPage() {
                 />
               )}
               {result.skipped !== undefined && (
-                <StatBlock label="Skipped" value={result.skipped} color="amber" />
+                <StatBlock
+                  label="Skipped"
+                  value={result.skipped}
+                  color="amber"
+                />
               )}
               {result.failures && result.failures.length > 0 && (
                 <StatBlock
@@ -361,10 +377,7 @@ export default function ImportPage() {
             <RefreshCw className="h-4 w-4 mr-1.5" />
             Import More
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => router.push("/dashboard")}
-          >
+          <Button variant="outline" onClick={() => router.push("/dashboard")}>
             Back to Dashboard
           </Button>
         </div>
@@ -422,7 +435,10 @@ export default function ImportPage() {
           <CardContent className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Default College</Label>
-              <Select value={defaultCollegeId} onValueChange={setDefaultCollegeId}>
+              <Select
+                value={defaultCollegeId}
+                onValueChange={(value) => setDefaultCollegeId(value ?? "")}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="None">
                     {colleges.find((c) => c.id === defaultCollegeId)?.name}
@@ -439,7 +455,10 @@ export default function ImportPage() {
             </div>
             <div className="space-y-2">
               <Label>Default Section</Label>
-              <Select value={defaultSectionId} onValueChange={setDefaultSectionId}>
+              <Select
+                value={defaultSectionId}
+                onValueChange={(value) => setDefaultSectionId(value ?? "")}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="None">
                     {(() => {
@@ -472,7 +491,10 @@ export default function ImportPage() {
             </p>
           </CardHeader>
           <CardContent>
-            <Select value={yearId} onValueChange={setYearId}>
+            <Select
+              value={yearId}
+              onValueChange={(value) => setYearId(value ?? "")}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select year">
                   {years.find((y) => y.id === yearId)?.label}
@@ -542,16 +564,32 @@ export default function ImportPage() {
             {/* Common stats */}
             <div className="grid gap-3 md:grid-cols-3">
               {preview.matched !== undefined && (
-                <PreviewStat label="Matched" value={preview.matched} color="emerald" />
+                <PreviewStat
+                  label="Matched"
+                  value={preview.matched}
+                  color="emerald"
+                />
               )}
               {preview.unmatched !== undefined && (
-                <PreviewStat label="Unmatched" value={preview.unmatched} color="amber" />
+                <PreviewStat
+                  label="Unmatched"
+                  value={preview.unmatched}
+                  color="amber"
+                />
               )}
               {preview.errors !== undefined && (
-                <PreviewStat label="Errors" value={preview.errors} color="destructive" />
+                <PreviewStat
+                  label="Errors"
+                  value={preview.errors}
+                  color="destructive"
+                />
               )}
               {preview.toImport !== undefined && (
-                <PreviewStat label="Ready to Import" value={preview.toImport} color="emerald" />
+                <PreviewStat
+                  label="Ready to Import"
+                  value={preview.toImport}
+                  color="emerald"
+                />
               )}
             </div>
 
@@ -559,9 +597,12 @@ export default function ImportPage() {
             {importType === "test-marks" && preview.testColumns && (
               <div className="space-y-3">
                 <div>
-                  <Label>Detected Test Columns ({preview.testColumns.length})</Label>
+                  <Label>
+                    Detected Test Columns ({preview.testColumns.length})
+                  </Label>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Set date and max marks for each — a new test card will be created
+                    Set date and max marks for each — a new test card will be
+                    created
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -571,8 +612,12 @@ export default function ImportPage() {
                       className="grid grid-cols-1 md:grid-cols-3 gap-2 p-3 border rounded-lg"
                     >
                       <div>
-                        <p className="text-xs text-muted-foreground mb-1">Test Name</p>
-                        <p className="text-sm font-medium truncate">{cfg.header}</p>
+                        <p className="text-xs text-muted-foreground mb-1">
+                          Test Name
+                        </p>
+                        <p className="text-sm font-medium truncate">
+                          {cfg.header}
+                        </p>
                       </div>
                       <div>
                         <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -600,7 +645,8 @@ export default function ImportPage() {
                           value={cfg.maxMarks}
                           onChange={(e) => {
                             const next = [...testsConfig];
-                            next[i].maxMarks = parseFloat(e.target.value) || 100;
+                            next[i].maxMarks =
+                              parseFloat(e.target.value) || 100;
                             setTestsConfig(next);
                           }}
                           className="h-8"
@@ -616,20 +662,25 @@ export default function ImportPage() {
             {preview.details?.unmatched?.length > 0 && (
               <div>
                 <p className="text-xs font-medium mb-2">
-                  Unmatched sample ({preview.details.unmatched.length} of {preview.unmatched}):
+                  Unmatched sample ({preview.details.unmatched.length} of{" "}
+                  {preview.unmatched}):
                 </p>
                 <div className="border rounded-lg divide-y max-h-40 overflow-y-auto">
-                  {preview.details.unmatched.slice(0, 10).map((u: any, i: number) => (
-                    <div key={i} className="p-2 text-xs">
-                      <span className="font-mono text-muted-foreground">
-                        Row {u.row?.rowNumber}
-                      </span>
-                      <span className="ml-2">
-                        {u.row?.name || u.row?.rollNumber || u.row?.email}
-                      </span>
-                      <span className="ml-2 text-amber-600">— {u.reason}</span>
-                    </div>
-                  ))}
+                  {preview.details.unmatched
+                    .slice(0, 10)
+                    .map((u: any, i: number) => (
+                      <div key={i} className="p-2 text-xs">
+                        <span className="font-mono text-muted-foreground">
+                          Row {u.row?.rowNumber}
+                        </span>
+                        <span className="ml-2">
+                          {u.row?.name || u.row?.rollNumber || u.row?.email}
+                        </span>
+                        <span className="ml-2 text-amber-600">
+                          — {u.reason}
+                        </span>
+                      </div>
+                    ))}
                 </div>
               </div>
             )}
@@ -716,8 +767,7 @@ function ImportTypeCard({
     primary: "bg-primary/10 text-primary hover:border-primary/40",
     emerald:
       "bg-[color:var(--emerald)]/10 text-[color:var(--emerald)] hover:border-[color:var(--emerald)]/40",
-    gold:
-      "bg-[color:var(--gold)]/10 text-[color:var(--gold)] hover:border-[color:var(--gold)]/40",
+    gold: "bg-[color:var(--gold)]/10 text-[color:var(--gold)] hover:border-[color:var(--gold)]/40",
   };
 
   return (
@@ -725,7 +775,7 @@ function ImportTypeCard({
       onClick={onClick}
       className={cn(
         "group text-left border rounded-lg p-5 hover:shadow-md hover:-translate-y-0.5 transition-all bg-card",
-        colorMap[color]
+        colorMap[color],
       )}
     >
       <div className={cn("inline-flex p-2.5 rounded-lg mb-3", colorMap[color])}>
@@ -760,7 +810,9 @@ function StatBlock({
 
   return (
     <div>
-      <p className={cn("text-2xl font-bold leading-tight", colorClass)}>{value}</p>
+      <p className={cn("text-2xl font-bold leading-tight", colorClass)}>
+        {value}
+      </p>
       <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">
         {label}
       </p>
