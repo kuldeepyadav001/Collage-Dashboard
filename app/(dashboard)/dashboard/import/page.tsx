@@ -58,18 +58,15 @@ export default function ImportPage() {
   const [committing, setCommitting] = useState(false);
   const [result, setResult] = useState<any>(null);
 
-  // Options for defaults
   const [years, setYears] = useState<Year[]>([]);
   const [colleges, setColleges] = useState<College[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
 
-  // Import-specific options
   const [yearId, setYearId] = useState("");
   const [defaultCollegeId, setDefaultCollegeId] = useState("");
   const [defaultSectionId, setDefaultSectionId] = useState("");
   const [addUnmatched, setAddUnmatched] = useState(true);
 
-  // Test-marks specific: per-column config
   const [testsConfig, setTestsConfig] = useState<
     { header: string; date: string; maxMarks: number }[]
   >([]);
@@ -134,7 +131,6 @@ export default function ImportPage() {
       }
       setPreview(data);
 
-      // For test-marks, pre-fill test configs from detected columns
       if (importType === "test-marks" && data.testColumns) {
         const today = new Date().toISOString().split("T")[0];
         setTestsConfig(
@@ -429,7 +425,9 @@ export default function ImportPage() {
           <CardHeader>
             <CardTitle className="text-base">Defaults (Optional)</CardTitle>
             <p className="text-xs text-muted-foreground mt-1">
-              Used when Excel doesn't specify these values
+              Used only when Excel row is empty. Students without
+              section/college are placed in "Unassigned" — you can move them
+              later.
             </p>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
@@ -437,14 +435,14 @@ export default function ImportPage() {
               <Label>Default College</Label>
               <Select
                 value={defaultCollegeId}
-                onValueChange={(value) => setDefaultCollegeId(value ?? "")}
+                onValueChange={(v) => setDefaultCollegeId(v || "")}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="None">
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="None (Unassigned)">
                     {colleges.find((c) => c.id === defaultCollegeId)?.name}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="min-w-[240px]">
                   {colleges.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.name}
@@ -457,10 +455,10 @@ export default function ImportPage() {
               <Label>Default Section</Label>
               <Select
                 value={defaultSectionId}
-                onValueChange={(value) => setDefaultSectionId(value ?? "")}
+                onValueChange={(v) => setDefaultSectionId(v || "")}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="None">
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="None (Unassigned)">
                     {(() => {
                       const s = sections.find((s) => s.id === defaultSectionId);
                       if (!s) return null;
@@ -468,12 +466,24 @@ export default function ImportPage() {
                     })()}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
-                  {sections.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.course.year.label} · {s.course.name} · {s.name}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="max-h-72 w-[--radix-select-trigger-width] min-w-[320px]">
+                  {sections.length === 0 ? (
+                    <div className="p-4 text-xs text-muted-foreground text-center">
+                      No sections yet
+                    </div>
+                  ) : (
+                    sections.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        <span className="font-medium">
+                          {s.course.year.label}
+                        </span>
+                        <span className="text-muted-foreground mx-1.5">·</span>
+                        <span>{s.course.name}</span>
+                        <span className="text-muted-foreground mx-1.5">·</span>
+                        <span>Section {s.name}</span>
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -491,11 +501,8 @@ export default function ImportPage() {
             </p>
           </CardHeader>
           <CardContent>
-            <Select
-              value={yearId}
-              onValueChange={(value) => setYearId(value ?? "")}
-            >
-              <SelectTrigger>
+            <Select value={yearId} onValueChange={(v) => setYearId(v || "")}>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select year">
                   {years.find((y) => y.id === yearId)?.label}
                 </SelectValue>
@@ -561,8 +568,7 @@ export default function ImportPage() {
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Common stats */}
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-4">
               {preview.matched !== undefined && (
                 <PreviewStat
                   label="Matched"
@@ -570,14 +576,22 @@ export default function ImportPage() {
                   color="emerald"
                 />
               )}
+              {preview.matchedWillChange !== undefined &&
+                preview.matchedWillChange > 0 && (
+                  <PreviewStat
+                    label="Will Update"
+                    value={preview.matchedWillChange}
+                    color="emerald"
+                  />
+                )}
               {preview.unmatched !== undefined && (
                 <PreviewStat
-                  label="Unmatched"
+                  label="New to Add"
                   value={preview.unmatched}
                   color="amber"
                 />
               )}
-              {preview.errors !== undefined && (
+              {preview.errors !== undefined && preview.errors > 0 && (
                 <PreviewStat
                   label="Errors"
                   value={preview.errors}
@@ -593,7 +607,6 @@ export default function ImportPage() {
               )}
             </div>
 
-            {/* Test columns detected */}
             {importType === "test-marks" && preview.testColumns && (
               <div className="space-y-3">
                 <div>
@@ -658,29 +671,166 @@ export default function ImportPage() {
               </div>
             )}
 
-            {/* Unmatched preview */}
+            {/* Matched students that will change */}
+            {preview.details?.matched?.length > 0 &&
+              preview.matchedWillChange > 0 && (
+                <div>
+                  <p className="text-xs font-medium mb-2">
+                    Existing students to update ({preview.matchedWillChange} of{" "}
+                    {preview.matched} matched will change):
+                  </p>
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="max-h-56 overflow-y-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-muted/50 sticky top-0">
+                          <tr>
+                            <th className="text-left p-2">Row</th>
+                            <th className="text-left p-2">Name</th>
+                            <th className="text-left p-2">Roll</th>
+                            <th className="text-left p-2">Changes</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {preview.details.matched
+                            .filter(
+                              (m: any) =>
+                                m.willUpdate &&
+                                Object.keys(m.willUpdate).length > 0,
+                            )
+                            .map((m: any, i: number) => (
+                              <tr key={i}>
+                                <td className="p-2 font-mono text-muted-foreground">
+                                  {m.rowNumber}
+                                </td>
+                                <td className="p-2 font-medium">{m.name}</td>
+                                <td className="p-2 font-mono">
+                                  {m.rollNumber}
+                                </td>
+                                <td className="p-2">
+                                  <div className="space-y-0.5">
+                                    {m.willUpdate.section && (
+                                      <div className="text-[10px]">
+                                        <span className="text-muted-foreground">
+                                          Section:
+                                        </span>{" "}
+                                        <span className="line-through opacity-60">
+                                          {m.willUpdate.section.from}
+                                        </span>{" "}
+                                        →{" "}
+                                        <span className="text-primary font-medium">
+                                          {m.willUpdate.section.to}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {m.willUpdate.college && (
+                                      <div className="text-[10px]">
+                                        <span className="text-muted-foreground">
+                                          College:
+                                        </span>{" "}
+                                        <span className="line-through opacity-60">
+                                          {m.willUpdate.college.from}
+                                        </span>{" "}
+                                        →{" "}
+                                        <span className="text-primary font-medium">
+                                          {m.willUpdate.college.to}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {m.willUpdate.phone && (
+                                      <div className="text-[10px] text-muted-foreground">
+                                        Phone will update
+                                      </div>
+                                    )}
+                                    {m.willUpdate.address && (
+                                      <div className="text-[10px] text-muted-foreground">
+                                        Address will update
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+            {/* New students to be created — full table */}
             {preview.details?.unmatched?.length > 0 && (
               <div>
                 <p className="text-xs font-medium mb-2">
-                  Unmatched sample ({preview.details.unmatched.length} of{" "}
-                  {preview.unmatched}):
+                  New students to be created ({preview.details.unmatched.length}{" "}
+                  {preview.unmatched > preview.details.unmatched.length &&
+                    `of ${preview.unmatched}`}
+                  ):
                 </p>
-                <div className="border rounded-lg divide-y max-h-40 overflow-y-auto">
-                  {preview.details.unmatched
-                    .slice(0, 10)
-                    .map((u: any, i: number) => (
-                      <div key={i} className="p-2 text-xs">
-                        <span className="font-mono text-muted-foreground">
-                          Row {u.row?.rowNumber}
-                        </span>
-                        <span className="ml-2">
-                          {u.row?.name || u.row?.rollNumber || u.row?.email}
-                        </span>
-                        <span className="ml-2 text-amber-600">
-                          — {u.reason}
-                        </span>
-                      </div>
-                    ))}
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="max-h-72 overflow-y-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/50 sticky top-0">
+                        <tr>
+                          <th className="text-left p-2">Row</th>
+                          <th className="text-left p-2">Name</th>
+                          <th className="text-left p-2">Roll</th>
+                          <th className="text-left p-2">Email</th>
+                          <th className="text-left p-2">Section</th>
+                          <th className="text-left p-2">College</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {preview.details.unmatched.map((u: any, i: number) => (
+                          <tr key={i}>
+                            <td className="p-2 font-mono text-muted-foreground">
+                              {u.rowNumber}
+                            </td>
+                            <td className="p-2 font-medium">{u.name}</td>
+                            <td className="p-2 font-mono">{u.rollNumber}</td>
+                            <td className="p-2 text-muted-foreground truncate max-w-[180px]">
+                              {u.email}
+                            </td>
+                            <td className="p-2">
+                              {u.section === "Unassigned" ? (
+                                <span className="text-amber-600 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 font-medium">
+                                  Unassigned
+                                </span>
+                              ) : (
+                                u.section
+                              )}
+                            </td>
+                            <td className="p-2">
+                              {u.college === "Unassigned" ? (
+                                <span className="text-amber-600 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 font-medium">
+                                  Unassigned
+                                </span>
+                              ) : (
+                                u.college
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {preview.details?.errors?.length > 0 && (
+              <div>
+                <p className="text-xs font-medium mb-2 text-destructive">
+                  Errors ({preview.details.errors.length}):
+                </p>
+                <div className="border border-destructive/40 rounded-lg divide-y max-h-32 overflow-y-auto">
+                  {preview.details.errors.map((e: any, i: number) => (
+                    <div key={i} className="p-2 text-xs">
+                      <span className="font-mono text-muted-foreground">
+                        Row {e.row?.rowNumber}
+                      </span>
+                      <span className="ml-2 text-destructive">{e.error}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -705,7 +855,6 @@ export default function ImportPage() {
               </div>
             )}
 
-            {/* Add unmatched option (students only) */}
             {importType === "students" && preview.unmatched > 0 && (
               <div className="flex items-start gap-2 p-3 border rounded-lg bg-amber-500/5">
                 <input
@@ -716,10 +865,10 @@ export default function ImportPage() {
                 />
                 <div>
                   <p className="text-sm font-medium">
-                    Add {preview.unmatched} unmatched students as new
+                    Create {preview.unmatched} new students
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Requires College and Section defaults (or in Excel columns)
+                    Missing section/college → placed in "Unassigned"
                   </p>
                 </div>
               </div>

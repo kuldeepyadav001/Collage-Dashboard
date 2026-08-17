@@ -62,7 +62,10 @@ export function pickField(
   for (const c of candidates) {
     const key = normalizeHeader(c);
     if (row[key] !== undefined && row[key] !== null && row[key] !== "") {
-      return row[key];
+      const val = row[key];
+      // Trim if string
+      if (typeof val === "string") return val.trim();
+      return val;
     }
   }
   return null;

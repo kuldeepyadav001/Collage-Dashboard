@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
 import { parseExcelBuffer, pickField } from "@/lib/excel-parser";
+import {
+  ensureUnassignedCollege,
+  ensureUnassignedSection,
+} from "@/lib/unassigned";
 
 export async function POST(
   req: Request,
@@ -16,15 +20,12 @@ export async function POST(
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const mode = (formData.get("mode") as string) || "preview";
-    const defaultCollegeId = formData.get("defaultCollegeId") as string | null;
-    const defaultSectionId = formData.get("defaultSectionId") as string | null;
     const addUnmatched = formData.get("addUnmatched") === "true";
 
     if (!file) {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
     }
 
-    // Get elite section (need its year)
     const elite = await prisma.eliteSection.findUnique({
       where: { id: eliteSectionId },
       include: { year: true },
@@ -41,10 +42,15 @@ export async function POST(
       return NextResponse.json({ error: "Excel is empty" }, { status: 400 });
     }
 
-    // Get lookups
     const [allStudents, existingMembers, colleges, sections] = await Promise.all([
       prisma.student.findMany({
-        select: { id: true, name: true, rollNumber: true, email: true, sectionId: true },
+        select: {
+          id: true,
+          name: true,
+          rollNumber: true,
+          email: true,
+          sectionId: true,
+        },
       }),
       prisma.eliteSectionMember.findMany({
         where: { eliteSectionId },
@@ -91,7 +97,6 @@ export async function POST(
       }))
       .filter((r) => r.rollNumber || r.email);
 
-    // Categorize
     const matched: { row: Parsed; student: any; alreadyMember: boolean }[] = [];
     const unmatched: { row: Parsed; reason: string }[] = [];
     const wrongYear: { row: Parsed; student: any }[] = [];
@@ -102,7 +107,6 @@ export async function POST(
       if (!student && row.email) student = byEmail.get(row.email.toLowerCase());
 
       if (student) {
-        // Check if student is from elite's year
         const isCorrectYear = yearSections.some((s) => s.id === student.sectionId);
         if (!isCorrectYear) {
           wrongYear.push({ row, student });
@@ -114,27 +118,10 @@ export async function POST(
           });
         }
       } else {
-        // Unmatched — would need to be created
-        const resolved = resolveIds(
-          row,
-          { colleges, yearSections },
-          { defaultCollegeId, defaultSectionId }
-        );
-
-        if (!resolved.collegeId || !resolved.sectionId) {
-          unmatched.push({
-            row,
-            reason: !resolved.sectionId
-              ? "Cannot determine section for creating this student"
-              : "Cannot determine college",
-          });
-          continue;
-        }
-
         if (!row.name || !row.rollNumber || !row.email) {
           unmatched.push({
             row,
-            reason: "Missing name, roll number, or email — cannot create",
+            reason: "Missing name, roll number, or email",
           });
           continue;
         }
@@ -146,7 +133,6 @@ export async function POST(
       }
     }
 
-    // Preview mode
     if (mode === "preview") {
       const willBeAdded = matched.filter((m) => !m.alreadyMember).length;
       const alreadyIn = matched.filter((m) => m.alreadyMember).length;
@@ -198,31 +184,43 @@ export async function POST(
       }
     }
 
-    // Wrong year — always skip (can't add)
+    // Wrong year — always skip
     skipped += wrongYear.length;
 
     // Create unmatched if user confirmed
     if (addUnmatched) {
+      const unassignedCollegeId = await ensureUnassignedCollege();
+      const unassignedSectionId = await ensureUnassignedSection(elite.year.id);
+
       for (const u of unmatched) {
         try {
-          if (
-            u.reason.startsWith("Cannot determine") ||
-            u.reason.startsWith("Missing")
-          ) {
+          if (u.reason.startsWith("Missing")) {
             skipped++;
             continue;
           }
 
-          const resolved = resolveIds(
-            u.row,
-            { colleges, yearSections },
-            { defaultCollegeId, defaultSectionId }
-          );
+          // Try Excel section/college first
+          let sectionId: string | null = null;
+          let collegeId: string | null = null;
 
-          if (!resolved.collegeId || !resolved.sectionId) {
-            skipped++;
-            continue;
+          if (u.row.sectionName && u.row.courseName) {
+            const m = yearSections.find(
+              (s) =>
+                s.name.toLowerCase() === u.row.sectionName!.toLowerCase() &&
+                s.course.name.toLowerCase() === u.row.courseName!.toLowerCase()
+            );
+            if (m) sectionId = m.id;
           }
+          if (u.row.collegeName) {
+            const m = colleges.find(
+              (c) => c.name.toLowerCase() === u.row.collegeName!.toLowerCase()
+            );
+            if (m) collegeId = m.id;
+          }
+
+          // Fallback to Unassigned
+          if (!sectionId) sectionId = unassignedSectionId;
+          if (!collegeId) collegeId = unassignedCollegeId;
 
           const newStudent = await prisma.student.create({
             data: {
@@ -231,8 +229,8 @@ export async function POST(
               email: u.row.email!.toLowerCase(),
               phone: u.row.phone,
               address: u.row.address,
-              sectionId: resolved.sectionId,
-              collegeId: resolved.collegeId,
+              sectionId,
+              collegeId,
             },
           });
 
@@ -272,32 +270,4 @@ function safeString(v: any): string | null {
   if (v === null || v === undefined) return null;
   const s = String(v).trim();
   return s === "" ? null : s;
-}
-
-function resolveIds(
-  row: any,
-  lookups: { colleges: any[]; yearSections: any[] },
-  defaults: { defaultCollegeId: string | null; defaultSectionId: string | null }
-): { collegeId: string | null; sectionId: string | null } {
-  let collegeId: string | null = null;
-  if (row.collegeName) {
-    const m = lookups.colleges.find(
-      (c) => c.name.toLowerCase() === row.collegeName.toLowerCase()
-    );
-    if (m) collegeId = m.id;
-  }
-  if (!collegeId) collegeId = defaults.defaultCollegeId;
-
-  let sectionId: string | null = null;
-  if (row.sectionName && row.courseName) {
-    const m = lookups.yearSections.find(
-      (s) =>
-        s.name.toLowerCase() === row.sectionName.toLowerCase() &&
-        s.course.name.toLowerCase() === row.courseName.toLowerCase()
-    );
-    if (m) sectionId = m.id;
-  }
-  if (!sectionId) sectionId = defaults.defaultSectionId;
-
-  return { collegeId, sectionId };
 }

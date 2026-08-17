@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -13,13 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Upload,
   Download,
   Loader2,
@@ -27,6 +20,7 @@ import {
   AlertCircle,
   ArrowRight,
   RefreshCw,
+  Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -36,16 +30,6 @@ interface Props {
   eliteId: string;
   eliteName: string;
   onImported: () => void;
-}
-
-interface College {
-  id: string;
-  name: string;
-}
-interface Section {
-  id: string;
-  name: string;
-  course: { name: string; year: { label: string } };
 }
 
 export function ImportMembersDialog({
@@ -60,32 +44,12 @@ export function ImportMembersDialog({
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [committing, setCommitting] = useState(false);
-
-  const [colleges, setColleges] = useState<College[]>([]);
-  const [sections, setSections] = useState<Section[]>([]);
-  const [defaultCollegeId, setDefaultCollegeId] = useState("");
-  const [defaultSectionId, setDefaultSectionId] = useState("");
   const [addUnmatched, setAddUnmatched] = useState(true);
-
-  useEffect(() => {
-    if (!open) return;
-    Promise.all([
-      fetch("/api/colleges").then((r) => r.json()),
-      fetch("/api/sections").then((r) => r.json()),
-    ])
-      .then(([c, s]) => {
-        setColleges(c);
-        setSections(s);
-      })
-      .catch(() => {});
-  }, [open]);
 
   function reset() {
     setFile(null);
     setPreview(null);
     setResult(null);
-    setDefaultCollegeId("");
-    setDefaultSectionId("");
   }
 
   function closeAndReset() {
@@ -101,8 +65,6 @@ export function ImportMembersDialog({
     const fd = new FormData();
     fd.append("file", file);
     fd.append("mode", "preview");
-    if (defaultCollegeId) fd.append("defaultCollegeId", defaultCollegeId);
-    if (defaultSectionId) fd.append("defaultSectionId", defaultSectionId);
 
     try {
       const res = await fetch(`/api/elite/${eliteId}/import`, {
@@ -127,8 +89,6 @@ export function ImportMembersDialog({
     const fd = new FormData();
     fd.append("file", file);
     fd.append("mode", "commit");
-    if (defaultCollegeId) fd.append("defaultCollegeId", defaultCollegeId);
-    if (defaultSectionId) fd.append("defaultSectionId", defaultSectionId);
     fd.append("addUnmatched", String(addUnmatched));
 
     try {
@@ -150,8 +110,11 @@ export function ImportMembersDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => (o ? onOpenChange(o) : closeAndReset())}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+    <Dialog
+      open={open}
+      onOpenChange={(o) => (o ? onOpenChange(o) : closeAndReset())}
+    >
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Import Members to "{eliteName}"</DialogTitle>
           <DialogDescription>
@@ -160,7 +123,11 @@ export function ImportMembersDialog({
         </DialogHeader>
 
         {result ? (
-          <ResultView result={result} onDone={closeAndReset} onImportMore={reset} />
+          <ResultView
+            result={result}
+            onDone={closeAndReset}
+            onImportMore={reset}
+          />
         ) : (
           <div className="space-y-4">
             {/* Template link */}
@@ -180,45 +147,19 @@ export function ImportMembersDialog({
               </a>
             </div>
 
-            {/* Defaults */}
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label className="text-xs">Default College (for new students)</Label>
-                <Select value={defaultCollegeId} onValueChange={(v)=>setDefaultCollegeId(v || "")}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="None">
-                      {colleges.find((c) => c.id === defaultCollegeId)?.name}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {colleges.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs">Default Section (for new students)</Label>
-                <Select value={defaultSectionId} onValueChange={(v)=>setDefaultSectionId(v || "")}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="None">
-                      {(() => {
-                        const s = sections.find((s) => s.id === defaultSectionId);
-                        if (!s) return null;
-                        return `${s.course.year.label} · ${s.course.name} · ${s.name}`;
-                      })()}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sections.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.course.year.label} · {s.course.name} · {s.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            {/* Info hint */}
+            <div className="flex gap-2 p-3 rounded-lg border bg-primary/5 border-primary/20">
+              <Info className="h-4 w-4 shrink-0 text-primary mt-0.5" />
+              <div className="text-xs text-muted-foreground">
+                <p className="font-medium text-foreground mb-1">
+                  Automatic handling
+                </p>
+                <p>
+                  New students not in the database will be created and added to
+                  this elite section. If their section or college is missing
+                  from Excel, they'll be placed in an "Unassigned" bucket that
+                  you can review later from the Manage page.
+                </p>
               </div>
             </div>
 
@@ -262,8 +203,10 @@ export function ImportMembersDialog({
 
             {/* Preview */}
             {preview && (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <p className="text-xs font-medium">Preview</p>
+
+                {/* Stat chips */}
                 <div className="grid gap-2 grid-cols-2 md:grid-cols-4">
                   <PreviewChip
                     label="Will Add"
@@ -277,12 +220,7 @@ export function ImportMembersDialog({
                   />
                   <PreviewChip
                     label="New Students"
-                    value={
-                      preview.unmatched -
-                      (preview.unmatchedSample?.filter((u: any) =>
-                        u.reason?.startsWith("Cannot")
-                      ).length || 0)
-                    }
+                    value={preview.unmatched}
                     color="amber"
                   />
                   <PreviewChip
@@ -292,18 +230,83 @@ export function ImportMembersDialog({
                   />
                 </div>
 
+                {/* Wrong year warning */}
                 {preview.wrongYear > 0 && (
-                  <div className="text-xs p-2 rounded border border-destructive/40 bg-destructive/5">
+                  <div className="text-xs p-3 rounded border border-destructive/40 bg-destructive/5">
                     <p className="font-medium text-destructive mb-1">
-                      {preview.wrongYear} students not from {preview.eliteYear} batch
+                      {preview.wrongYear} students not from batch{" "}
+                      {preview.eliteYear}
                     </p>
                     <p className="text-muted-foreground">
                       They exist in the database but belong to different years.
                       Cannot be added.
                     </p>
+                    {preview.wrongYearSample?.length > 0 && (
+                      <div className="mt-2 space-y-0.5">
+                        {preview.wrongYearSample.map((w: any, i: number) => (
+                          <div key={i} className="font-mono text-[10px]">
+                            Row {w.rowNumber}: {w.name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
+                {/* New students to be created — full table */}
+                {preview.unmatchedSample?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium mb-2">
+                      New students to be created (
+                      {preview.unmatchedSample.length}
+                      {preview.unmatched > preview.unmatchedSample.length &&
+                        ` of ${preview.unmatched}`}
+                      ):
+                    </p>
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="max-h-64 overflow-y-auto">
+                        <table className="w-full text-xs">
+                          <thead className="bg-muted/50 sticky top-0">
+                            <tr>
+                              <th className="text-left p-2">Row</th>
+                              <th className="text-left p-2">Name / Roll</th>
+                              <th className="text-left p-2">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {preview.unmatchedSample.map(
+                              (u: any, i: number) => (
+                                <tr key={i}>
+                                  <td className="p-2 font-mono text-muted-foreground">
+                                    {u.rowNumber}
+                                  </td>
+                                  <td className="p-2">
+                                    <p className="font-medium">
+                                      {u.identity}
+                                    </p>
+                                  </td>
+                                  <td className="p-2">
+                                    {u.reason.startsWith("Missing") ? (
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-medium">
+                                        Can't create — {u.reason}
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 font-medium">
+                                        Will be created
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              )
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Confirmation checkbox */}
                 {preview.unmatched > 0 && (
                   <div className="flex items-start gap-2 p-3 rounded border bg-amber-500/5">
                     <input
@@ -317,7 +320,7 @@ export function ImportMembersDialog({
                         Create {preview.unmatched} new students & add to elite
                       </p>
                       <p className="text-muted-foreground mt-0.5">
-                        Requires default college + section (or in Excel)
+                        Missing section/college info uses "Unassigned"
                       </p>
                     </div>
                   </div>
@@ -392,7 +395,9 @@ function ResultView({
           <div className="border rounded-lg divide-y max-h-40 overflow-y-auto">
             {result.failures.map((f: any, i: number) => (
               <div key={i} className="p-2 text-xs">
-                <span className="font-mono text-muted-foreground">Row {f.row}</span>
+                <span className="font-mono text-muted-foreground">
+                  Row {f.row}
+                </span>
                 <span className="ml-2 text-destructive">{f.reason}</span>
               </div>
             ))}
@@ -421,7 +426,8 @@ function PreviewChip({
   color: "emerald" | "muted" | "amber" | "destructive" | "primary";
 }) {
   const bg = {
-    emerald: "bg-[color:var(--emerald)]/10 text-[color:var(--emerald)] border-[color:var(--emerald)]/40",
+    emerald:
+      "bg-[color:var(--emerald)]/10 text-[color:var(--emerald)] border-[color:var(--emerald)]/40",
     muted: "bg-muted text-muted-foreground border-border",
     amber: "bg-amber-500/10 text-amber-600 border-amber-500/40",
     destructive: "bg-destructive/10 text-destructive border-destructive/40",

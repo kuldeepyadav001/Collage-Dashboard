@@ -16,10 +16,8 @@ import { Calendar, Check, ChevronDown } from "lucide-react";
 
 export function YearSwitcher() {
   const { selectedYear, setSelectedYear, refreshBump } = useSelectedYear();
-  
   const [years, setYears] = useState<number[]>([]);
 
-  // Fetch available years from API
   useEffect(() => {
     fetch("/api/years")
       .then((r) => (r.ok ? r.json() : []))
@@ -29,13 +27,18 @@ export function YearSwitcher() {
           .filter((n) => !isNaN(n))
           .sort((a, b) => b - a);
         setYears(parsed);
+
+        // Clear stale selection if year no longer exists
+        if (selectedYear !== null && !parsed.includes(selectedYear)) {
+          setSelectedYear(null);
+        }
       })
       .catch(() => setYears([]));
-  }, [refreshBump]);
+  }, [refreshBump, selectedYear, setSelectedYear]);
 
   const activeBatches = years
     .map((y) => getBatchInfo(y))
-    .filter((b) => b.status === "ACTIVE");
+    .filter((b) => b.status === "ACTIVE" || b.status === "UPCOMING");
 
   const passedOutBatches = years
     .map((y) => getBatchInfo(y))
@@ -50,7 +53,7 @@ export function YearSwitcher() {
         <span className="font-medium">
           {selectedInfo ? (
             <>
-              {selectedInfo.admissionYear}
+              Batch {selectedInfo.passingYear}
               <span className="text-muted-foreground ml-1.5">
                 · {selectedInfo.label}
               </span>
@@ -61,7 +64,7 @@ export function YearSwitcher() {
         </span>
         <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-56">
+      <DropdownMenuContent align="start" className="w-64">
         <DropdownMenuItem
           onClick={() => setSelectedYear(null)}
           className="flex items-center justify-between"
@@ -78,17 +81,17 @@ export function YearSwitcher() {
             </DropdownMenuLabel>
             {activeBatches.map((b) => (
               <DropdownMenuItem
-                key={b.admissionYear}
-                onClick={() => setSelectedYear(b.admissionYear)}
+                key={b.passingYear}
+                onClick={() => setSelectedYear(b.passingYear)}
                 className="flex items-center justify-between"
               >
-                <span>
-                  {b.admissionYear}
-                  <span className="text-muted-foreground ml-1.5 text-xs">
-                    · {b.label}
+                <div className="flex flex-col">
+                  <span>Batch {b.passingYear}</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {b.label} · admitted {b.admissionYear}
                   </span>
-                </span>
-                {selectedYear === b.admissionYear && (
+                </div>
+                {selectedYear === b.passingYear && (
                   <Check className="h-3.5 w-3.5" />
                 )}
               </DropdownMenuItem>
@@ -101,21 +104,21 @@ export function YearSwitcher() {
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                Passed Out
+                Alumni
               </DropdownMenuLabel>
               {passedOutBatches.map((b) => (
                 <DropdownMenuItem
-                  key={b.admissionYear}
-                  onClick={() => setSelectedYear(b.admissionYear)}
+                  key={b.passingYear}
+                  onClick={() => setSelectedYear(b.passingYear)}
                   className="flex items-center justify-between"
                 >
-                  <span>
-                    {b.admissionYear}
-                    <span className="text-muted-foreground ml-1.5 text-xs">
-                      · Alumni
+                  <div className="flex flex-col">
+                    <span>Batch {b.passingYear}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      Passed out · admitted {b.admissionYear}
                     </span>
-                  </span>
-                  {selectedYear === b.admissionYear && (
+                  </div>
+                  {selectedYear === b.passingYear && (
                     <Check className="h-3.5 w-3.5" />
                   )}
                 </DropdownMenuItem>
@@ -123,11 +126,12 @@ export function YearSwitcher() {
             </DropdownMenuGroup>
           </>
         )}
+
         {years.length === 0 && (
           <div className="px-2 py-6 text-center">
             <p className="text-xs text-muted-foreground">No batches yet</p>
             <p className="text-[10px] text-muted-foreground mt-1">
-              Add a year from Manage
+              Add a passing year from Manage
             </p>
           </div>
         )}

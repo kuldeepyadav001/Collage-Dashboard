@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
 import { parseExcelBuffer, pickField } from "@/lib/excel-parser";
+import {
+  ensureUnassignedCollege,
+  ensureUnassignedSection,
+} from "@/lib/unassigned";
 
 interface StudentRow {
   rowNumber: number;
@@ -16,23 +20,6 @@ interface StudentRow {
   yearLabel: string | null;
 }
 
-interface MatchResult {
-  matched: {
-    row: StudentRow;
-    student: { id: string; name: string; rollNumber: string };
-    action: "update" | "no_change";
-  }[];
-  unmatched: {
-    row: StudentRow;
-    reason: string;
-  }[];
-  errors: {
-    row: StudentRow;
-    error: string;
-  }[];
-}
-
-// STEP 1: PREVIEW — parses + matches, returns summary WITHOUT writing
 export async function POST(req: Request) {
   const { error } = await requireAuth("WRITE_ADMIN");
   if (error) return error;
@@ -58,7 +45,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Excel file is empty" }, { status: 400 });
     }
 
-    // Parse each row into structured student data
     const studentRows: StudentRow[] = rows.map((r) => ({
       rowNumber: r.rowNumber,
       name: safeString(pickField(r.data, ["name", "fullname", "studentname"])),
@@ -74,14 +60,16 @@ export async function POST(req: Request) {
       courseName: safeString(pickField(r.data, ["course", "coursename", "branch"])),
       sectionName: safeString(pickField(r.data, ["section", "sectionname", "sec"])),
       yearLabel: safeString(
-        pickField(r.data, ["year", "batch", "yearlabel", "admissionyear"])
+        pickField(r.data, ["year", "batch", "yearlabel", "admissionyear", "passingyear"])
       ),
     }));
 
-    // Load lookup data
     const [allStudents, colleges, years, courses, sections] = await Promise.all([
       prisma.student.findMany({
-        select: { id: true, name: true, rollNumber: true, email: true },
+        include: {
+          college: true,
+          section: { include: { course: { include: { year: true } } } },
+        },
       }),
       prisma.college.findMany(),
       prisma.year.findMany(),
@@ -89,110 +77,190 @@ export async function POST(req: Request) {
       prisma.section.findMany({ include: { course: { include: { year: true } } } }),
     ]);
 
+    // Whitespace-safe lookups
     const studentsByRoll = new Map(
-      allStudents.map((s) => [s.rollNumber.toLowerCase(), s])
+      allStudents.map((s) => [s.rollNumber.toLowerCase().trim(), s])
     );
     const studentsByEmail = new Map(
-      allStudents.map((s) => [s.email.toLowerCase(), s])
+      allStudents.map((s) => [s.email.toLowerCase().trim(), s])
     );
 
-    const result: MatchResult = {
-      matched: [],
-      unmatched: [],
-      errors: [],
-    };
+    interface MatchedItem {
+      row: StudentRow;
+      student: any;
+      willUpdate: {
+        section?: { from: string; to: string };
+        college?: { from: string; to: string };
+        phone?: boolean;
+        address?: boolean;
+      };
+    }
 
-    // Match each row
+    interface UnmatchedItem {
+      row: StudentRow;
+      willBeCreatedIn: {
+        section: string;
+        college: string;
+      };
+    }
+
+    const matched: MatchedItem[] = [];
+    const unmatched: UnmatchedItem[] = [];
+    const errors: { row: StudentRow; error: string }[] = [];
+
     for (const row of studentRows) {
-      // Basic validation
-      if (!row.name && !row.rollNumber && !row.email) {
-        continue; // skip completely empty rows
-      }
+      if (!row.name && !row.rollNumber && !row.email) continue;
 
       if (!row.rollNumber && !row.email) {
-        result.errors.push({
-          row,
-          error: "Missing both roll number and email",
-        });
+        errors.push({ row, error: "Missing both roll number and email" });
         continue;
       }
 
-      // Try to match
+      // Match with whitespace tolerance
       let existing = null;
       if (row.rollNumber) {
-        existing = studentsByRoll.get(row.rollNumber.toLowerCase());
+        existing = studentsByRoll.get(row.rollNumber.toLowerCase().trim());
       }
       if (!existing && row.email) {
-        existing = studentsByEmail.get(row.email.toLowerCase());
+        existing = studentsByEmail.get(row.email.toLowerCase().trim());
       }
 
       if (existing) {
-        result.matched.push({
-          row,
-          student: existing,
-          action: "update",
-        });
-      } else {
-        // Try to resolve where this new student would go
-        const resolved = resolveTargetIds(
-          row,
-          { colleges, years, courses, sections },
-          {
-            defaultYearId,
-            defaultCollegeId,
-            defaultCourseId,
-            defaultSectionId,
-          }
-        );
+        // Compute what will change (for preview)
+        const willUpdate: any = {};
 
-        if (!resolved.sectionId || !resolved.collegeId) {
-          result.unmatched.push({
+        // Section change check
+        if (row.sectionName && row.courseName && row.yearLabel) {
+          const targetSection = sections.find(
+            (s) =>
+              s.name.toLowerCase() === row.sectionName!.toLowerCase() &&
+              s.course.name.toLowerCase() === row.courseName!.toLowerCase() &&
+              s.course.year.label === row.yearLabel
+          );
+          if (targetSection && targetSection.id !== existing.sectionId) {
+            willUpdate.section = {
+              from: `${existing.section.course.name} · ${existing.section.name}`,
+              to: `${targetSection.course.name} · ${targetSection.name}`,
+            };
+          }
+        }
+
+        // College change check
+        if (row.collegeName) {
+          const targetCollege = colleges.find(
+            (c) => c.name.toLowerCase() === row.collegeName!.toLowerCase()
+          );
+          if (targetCollege && targetCollege.id !== existing.collegeId) {
+            willUpdate.college = {
+              from: existing.college.name,
+              to: targetCollege.name,
+            };
+          }
+        }
+
+        if (row.phone && row.phone !== existing.phone) willUpdate.phone = true;
+        if (row.address && row.address !== existing.address) willUpdate.address = true;
+
+        matched.push({ row, student: existing, willUpdate });
+      } else {
+        if (!row.name || !row.rollNumber || !row.email) {
+          errors.push({
             row,
-            reason: !resolved.sectionId
-              ? "Cannot determine section (no default set and no matching Excel columns)"
-              : "Cannot determine college",
+            error: "Missing name, roll number, or email for new student",
           });
           continue;
         }
 
-        // Would create if user confirms
-        result.unmatched.push({
+        // Determine where new student will go
+        const resolved = resolveTargetIds(
           row,
-          reason: "New student — will be created if you confirm",
+          { colleges, years, courses, sections },
+          { defaultYearId, defaultCollegeId, defaultCourseId, defaultSectionId }
+        );
+
+        const collegeLabel = resolved.collegeId
+          ? colleges.find((c) => c.id === resolved.collegeId)?.name || "Unassigned"
+          : "Unassigned";
+        const sectionLabel = resolved.sectionId
+          ? (() => {
+              const s = sections.find((s) => s.id === resolved.sectionId);
+              return s ? `${s.course.name} · ${s.name}` : "Unassigned";
+            })()
+          : "Unassigned";
+
+        unmatched.push({
+          row,
+          willBeCreatedIn: {
+            section: sectionLabel,
+            college: collegeLabel,
+          },
         });
       }
     }
 
-    // If mode = preview, just return the report
     if (mode === "preview") {
       return NextResponse.json({
         preview: true,
         totalRows: studentRows.length,
-        matched: result.matched.length,
-        unmatched: result.unmatched.length,
-        errors: result.errors.length,
+        matched: matched.length,
+        matchedWillChange: matched.filter(
+          (m) => Object.keys(m.willUpdate).length > 0
+        ).length,
+        unmatched: unmatched.length,
+        errors: errors.length,
         details: {
-          matched: result.matched.slice(0, 10),
-          unmatched: result.unmatched.slice(0, 20),
-          errors: result.errors,
+          matched: matched.slice(0, 20).map((m) => ({
+            rowNumber: m.row.rowNumber,
+            name: m.student.name,
+            rollNumber: m.student.rollNumber,
+            willUpdate: m.willUpdate,
+          })),
+          unmatched: unmatched.slice(0, 30).map((u) => ({
+            rowNumber: u.row.rowNumber,
+            name: u.row.name,
+            rollNumber: u.row.rollNumber,
+            email: u.row.email,
+            section: u.willBeCreatedIn.section,
+            college: u.willBeCreatedIn.college,
+          })),
+          errors: errors.slice(0, 10),
         },
       });
     }
 
-    // Mode = commit — actually write to database
+    // COMMIT mode
     let updated = 0;
     let created = 0;
     let skipped = 0;
     const failures: any[] = [];
 
-    // Update matched students
-    for (const m of result.matched) {
+    // Update matched — INCLUDING section/college if provided
+    for (const m of matched) {
       try {
         const updateData: any = {};
         if (m.row.name) updateData.name = m.row.name;
-        if (m.row.email) updateData.email = m.row.email.toLowerCase();
+        if (m.row.email) updateData.email = m.row.email.toLowerCase().trim();
         if (m.row.phone) updateData.phone = m.row.phone;
         if (m.row.address) updateData.address = m.row.address;
+
+        // Update section if Excel provides valid one
+        if (m.row.sectionName && m.row.courseName && m.row.yearLabel) {
+          const targetSection = sections.find(
+            (s) =>
+              s.name.toLowerCase() === m.row.sectionName!.toLowerCase() &&
+              s.course.name.toLowerCase() === m.row.courseName!.toLowerCase() &&
+              s.course.year.label === m.row.yearLabel
+          );
+          if (targetSection) updateData.sectionId = targetSection.id;
+        }
+
+        // Update college if Excel provides valid one
+        if (m.row.collegeName) {
+          const targetCollege = colleges.find(
+            (c) => c.name.toLowerCase() === m.row.collegeName!.toLowerCase()
+          );
+          if (targetCollege) updateData.collegeId = targetCollege.id;
+        }
 
         if (Object.keys(updateData).length > 0) {
           await prisma.student.update({
@@ -206,48 +274,52 @@ export async function POST(req: Request) {
       }
     }
 
-    // Create unmatched if user confirmed
     if (addUnmatched) {
-      for (const u of result.unmatched) {
-        try {
-          if (u.reason.startsWith("Cannot determine")) {
-            skipped++;
-            continue;
-          }
+      const unassignedCollegeId = await ensureUnassignedCollege();
 
+      let fallbackYearId = defaultYearId;
+      if (!fallbackYearId) {
+        const firstYear = await prisma.year.findFirst({
+          orderBy: { label: "desc" },
+        });
+        if (firstYear) fallbackYearId = firstYear.id;
+      }
+
+      for (const u of unmatched) {
+        try {
           const resolved = resolveTargetIds(
             u.row,
             { colleges, years, courses, sections },
-            {
-              defaultYearId,
-              defaultCollegeId,
-              defaultCourseId,
-              defaultSectionId,
-            }
+            { defaultYearId, defaultCollegeId, defaultCourseId, defaultSectionId }
           );
 
-          if (!resolved.sectionId || !resolved.collegeId) {
-            skipped++;
-            continue;
-          }
+          let studentYearId = resolved.yearId;
+          if (!studentYearId) studentYearId = fallbackYearId;
 
-          if (!u.row.name || !u.row.rollNumber || !u.row.email) {
+          if (!studentYearId) {
             failures.push({
               row: u.row.rowNumber,
-              reason: "Missing required fields (name, roll, email)",
+              reason: "No year in system — add a year in Manage first",
             });
             continue;
           }
 
+          let finalSectionId = resolved.sectionId;
+          if (!finalSectionId) {
+            finalSectionId = await ensureUnassignedSection(studentYearId);
+          }
+
+          const finalCollegeId = resolved.collegeId || unassignedCollegeId;
+
           await prisma.student.create({
             data: {
-              name: u.row.name,
-              rollNumber: u.row.rollNumber,
-              email: u.row.email.toLowerCase(),
+              name: u.row.name!,
+              rollNumber: u.row.rollNumber!.trim(),
+              email: u.row.email!.toLowerCase().trim(),
               phone: u.row.phone,
               address: u.row.address,
-              sectionId: resolved.sectionId,
-              collegeId: resolved.collegeId,
+              sectionId: finalSectionId,
+              collegeId: finalCollegeId,
             },
           });
           created++;
@@ -259,7 +331,7 @@ export async function POST(req: Request) {
         }
       }
     } else {
-      skipped = result.unmatched.length;
+      skipped = unmatched.length;
     }
 
     return NextResponse.json({
@@ -267,7 +339,7 @@ export async function POST(req: Request) {
       updated,
       created,
       skipped,
-      errors: result.errors.length,
+      errors: errors.length,
       failures,
     });
   } catch (err: any) {
@@ -298,8 +370,7 @@ function resolveTargetIds(
     defaultCourseId: string | null;
     defaultSectionId: string | null;
   }
-): { collegeId: string | null; sectionId: string | null } {
-  // College
+): { collegeId: string | null; sectionId: string | null; yearId: string | null } {
   let collegeId: string | null = null;
   if (row.collegeName) {
     const match = lookups.colleges.find(
@@ -309,8 +380,8 @@ function resolveTargetIds(
   }
   if (!collegeId) collegeId = defaults.defaultCollegeId;
 
-  // Section is trickier — needs year + course + section combo
   let sectionId: string | null = null;
+  let yearId: string | null = null;
 
   if (row.sectionName && row.courseName && row.yearLabel) {
     const match = lookups.sections.find(
@@ -319,9 +390,24 @@ function resolveTargetIds(
         s.course.name.toLowerCase() === row.courseName!.toLowerCase() &&
         s.course.year.label === row.yearLabel
     );
-    if (match) sectionId = match.id;
+    if (match) {
+      sectionId = match.id;
+      yearId = match.course.yearId;
+    }
   }
   if (!sectionId) sectionId = defaults.defaultSectionId;
 
-  return { collegeId, sectionId };
+  if (!yearId && defaults.defaultSectionId) {
+    const s = lookups.sections.find((s) => s.id === defaults.defaultSectionId);
+    if (s) yearId = s.course.yearId;
+  }
+
+  if (!yearId && row.yearLabel) {
+    const y = lookups.years.find((y) => y.label === row.yearLabel);
+    if (y) yearId = y.id;
+  }
+
+  if (!yearId) yearId = defaults.defaultYearId;
+
+  return { collegeId, sectionId, yearId };
 }
